@@ -44,8 +44,8 @@
     </style>
 </head>
 <body>
-    <div id="textDisplay"></div>
-    <button id="micButton" class="start-button" onclick="handleClick()" aria-label="Voice command button"></button>
+    <div id="textDisplay" role="status" aria-live="polite"></div>
+    <button id="micButton" class="start-button" onclick="handleClick()" aria-label="Voice command button - Tap to speak"></button>
 
     <script>
         const micButton = document.getElementById('micButton');
@@ -65,7 +65,6 @@
             browserSupport.https = window.location.protocol === 'https:' || window.location.hostname === 'localhost';
             browserSupport.speechSynthesis = !!(window.speechSynthesis && window.SpeechSynthesisUtterance);
             browserSupport.speechRecognition = !!(window.webkitSpeechRecognition || window.SpeechRecognition);
-            console.log('Browser Support:', browserSupport);
         }
 
         const game = {
@@ -80,6 +79,7 @@
                 maxMana: 50,
                 gold: 25,
                 inventory: [],
+                equippedRings: [],
                 position: { x: 5, y: 5 }
             },
             dungeon: {
@@ -237,7 +237,9 @@
         const rings = [
             { name: 'Ring of Minor Health', effect: '+10 Max Health', stat: 'maxHealth', value: 10 },
             { name: 'Ring of Minor Mana', effect: '+10 Max Mana', stat: 'maxMana', value: 10 },
-            { name: 'Ring of Protection', effect: '+5 Max Health', stat: 'maxHealth', value: 5 }
+            { name: 'Ring of Protection', effect: '+5 Max Health', stat: 'maxHealth', value: 5 },
+            { name: 'Ring of Strength', effect: '+2 Attack Damage', stat: 'attack', value: 2 },
+            { name: 'Ring of Wisdom', effect: '+5 Max Mana', stat: 'maxMana', value: 5 }
         ];
 
         function speak(text, callback) {
@@ -250,7 +252,7 @@
                 speechSynthesis.cancel();
                 setTimeout(() => {
                     const utterance = new SpeechSynthesisUtterance(text.replace(/<[^>]*>/g, ''));
-                    utterance.rate = 0.8;
+                    utterance.rate = 0.9;
                     if (callback) {
                         utterance.onend = callback;
                         utterance.onerror = callback;
@@ -281,7 +283,7 @@
 
         function startListening() {
             if (!browserSupport.speechRecognition || !browserSupport.https) {
-                speak('Voice recognition requires HTTPS and a compatible browser. Please use Chrome.');
+                speak('Voice recognition requires HTTPS and a compatible browser like Chrome or Edge.');
                 return;
             }
             if (game.listening) { stopListening(); return; }
@@ -296,25 +298,20 @@
                 };
                 recognition.onresult = (event) => {
                     const command = event.results[0][0].transcript.toLowerCase().trim();
-                    console.log('Recognized command:', command);
                     displayText(`You said: "${command}"`);
                     stopListening();
                     setTimeout(() => processCommand(command), 500);
                 };
                 recognition.onerror = (event) => {
                     stopListening();
-                    if (event.error === 'no-speech') {
-                        speak('No speech detected. Please say your command clearly.');
-                    } else if (event.error === 'aborted') {
-                        speak('Voice input was aborted. Try again.');
-                    } else {
-                        speak(`Voice error: ${event.error}. Use Chrome for best results and ensure a clear microphone.`);
+                    if (event.error !== 'no-speech' && event.error !== 'aborted') {
+                        speak('Voice error. Try again.');
                     }
                 };
                 recognition.onend = () => stopListening();
                 recognition.start();
             } catch (error) {
-                speak('Failed to start voice recognition. Please try again.');
+                speak('Failed to start voice recognition.');
                 stopListening();
             }
         }
@@ -375,7 +372,7 @@
         function initializeGame() {
             game.initialized = true;
             micButton.classList.remove('start-button');
-            speak("Welcome to Echo Dungeon Enhanced! First, choose your class by saying 'warrior,' 'mage,' or 'rogue.' Or say 'load game' with a save code.");
+            speak("Welcome to Echo Dungeon Enhanced! Say 'load game' and provide your save code, or choose your class: warrior, mage, or rogue."); 
         }
 
         function handleClick() {
@@ -387,12 +384,6 @@
         }
 
         function processCommand(command) {
-            console.log('Processing command:', command, 'Game State:', {
-                needsClass: game.needsClass,
-                combat: !!game.combat,
-                phase: game.phase
-            });
-            
             if (command.includes('save game') || command.includes('save')) { 
                 saveGame(); 
                 return; 
@@ -410,46 +401,40 @@
             }
 
             if (game.needsClass) {
-                if (command.includes('warrior')) selectClass('warrior');
+                if (command.includes('warrior') || command.includes('fighter')) selectClass('warrior');
                 else if (command.includes('mage') || command.includes('wizard')) selectClass('mage'); 
-                else if (command.includes('rogue')) selectClass('rogue');
-                else speak('Please say warrior, mage, or rogue to choose your class.');
+                else if (command.includes('rogue') || command.includes('thief')) selectClass('rogue');
+                else speak('Please say warrior, mage, or rogue.');
                 return;
             }
 
             if (game.combat) {
-                if (command.includes('attack')) playerAttack();
-                else if (command.includes('defend')) playerDefend();
-                else if (command.includes('special')) playerSpecial();
-                else if (command.includes('potion') || command.includes('use') || command.includes('drink')) processPotionCommand(command); 
-                else if (command.includes('flee') || command.includes('run')) attemptFlee();
+                if (command.includes('attack') || command.includes('fight')) playerAttack();
+                else if (command.includes('defend') || command.includes('block') || command.includes('guard')) playerDefend();
+                else if (command.includes('special') || command.includes('ability')) playerSpecial();
+                else if (command.includes('potion') || command.includes('use') || command.includes('drink') || command.includes('heal')) processPotionCommand(command); 
+                else if (command.includes('flee') || command.includes('run') || command.includes('escape')) attemptFlee();
                 else speak('Say attack, defend, special, use potion, or flee.');
                 return;
             }
 
-            if (command.includes('status') || command.includes('stats')) characterStatus();
-            else if (command.includes('inventory') || command.includes('items')) listInventory();
+            if (command.includes('status') || command.includes('stats') || command.includes('check')) characterStatus();
+            else if (command.includes('inventory') || command.includes('items') || command.includes('bag')) listInventory();
             else if (command.includes('commands') || command.includes('what can i')) listCommands();
-            else if (command.includes('hint')) giveHint();
-            else if (command.includes('north') || command.includes('go north') || command.includes('move north')) move('north');
-            else if (command.includes('south') || command.includes('go south') || command.includes('move south')) move('south');
-            else if (command.includes('east') || command.includes('go east') || command.includes('move east')) move('east');
-            else if (command.includes('west') || command.includes('go west') || command.includes('move west')) move('west');
+            else if (command.includes('hint') || command.includes('help me')) giveHint();
+            else if (command.includes('north') || command.includes('forward')) move('north');
+            else if (command.includes('south') || command.includes('back')) move('south');
+            else if (command.includes('east') || command.includes('right')) move('east');
+            else if (command.includes('west') || command.includes('left')) move('west');
             else if (command.includes('meditate') || command.includes('rest')) meditate(); 
-            else if (command.includes('look') || command.includes('around')) describeRoom();
-            else if (command.includes('search') || command.includes('look for') || command.includes('find')) searchRoom();
-            else if (command.includes('open chest') || command.includes('chest')) openChest();
+            else if (command.includes('look') || command.includes('around') || command.includes('where')) describeRoom();
+            else if (command.includes('search') || command.includes('examine')) searchRoom();
+            else if (command.includes('open chest') || command.includes('chest') || command.includes('loot')) openChest();
             else if (command.includes('fountain') || command.includes('drink water')) useFountain();
             else if (command.includes('stairs') || command.includes('go down') || command.includes('descend')) useStairs();
-            else if (command.includes('wear ring') || command.includes('equip ring')) equipRing(command);
-            else if (command.includes('repeat')) {
-                if (game.combat) {
-                    listCommands();
-                } else {
-                    describeRoom();
-                }
-            }
-            else speak('Unknown command. Say help for options or try saying your command clearly.');
+            else if (command.includes('wear ring') || command.includes('equip ring') || command.includes('put on ring')) equipRing(command);
+            else if (command.includes('help')) showHelp();
+            else speak('Unknown command. Say help for options.');
         }
 
         function gainExperience(exp) {
@@ -482,18 +467,32 @@
         }
 
         function equipRing(command) {
-            const ringName = (command.includes('health') || command.includes('heal') || command.includes('healthy')) ? 'Ring of Minor Health' :
-                             (command.includes('mana') || command.includes('magic')) ? 'Ring of Minor Mana' :
-                             (command.includes('protection') || command.includes('protect')) ? 'Ring of Protection' : null;
+            const ringName = command.includes('health') ? 'Ring of Minor Health' :
+                             command.includes('mana') ? 'Ring of Minor Mana' :
+                             command.includes('protection') ? 'Ring of Protection' :
+                             command.includes('strength') ? 'Ring of Strength' :
+                             command.includes('wisdom') ? 'Ring of Wisdom' : null;
 
             if (!ringName) {
-                speak('Which ring? Say the type: health, mana, or protection.');
+                const availableRings = game.player.inventory.filter(item => 
+                    rings.some(r => r.name === item)
+                );
+                if (availableRings.length > 0) {
+                    speak(`You have: ${availableRings.join(', ')}. Say which one to equip.`);
+                } else {
+                    speak('You have no rings. Find them in treasure chests or by searching rooms.');
+                }
                 return;
             }
 
-            const ringIndex = game.player.inventory.indexOf(ringName);
+            const ringIndex = game.player.inventory.findIndex(item => item === ringName);
             if (ringIndex === -1) {
-                speak(`You do not have a ${ringName}. Say 'inventory' to check your items.`);
+                speak(`You do not have a ${ringName}.`);
+                return;
+            }
+
+            if (game.player.equippedRings.includes(ringName)) {
+                speak(`You are already wearing the ${ringName}.`);
                 return;
             }
 
@@ -503,22 +502,19 @@
                 return;
             }
 
-            if (game.player.inventory.includes(`(E) ${ringName}`)) {
-                speak(`You are already wearing the ${ringName}.`);
-                return;
-            }
-
             game.player.inventory.splice(ringIndex, 1);
-            game.player.inventory.push(`(E) ${ringName}`);
+            game.player.equippedRings.push(ringName);
 
             if (ringData.stat === 'maxHealth') {
                 game.player.maxHealth += ringData.value;
                 game.player.health += ringData.value;
-                speak(`You equip the ${ringName}. Your Max Health increased by ${ringData.value}!`);
+                speak(`You equip the ${ringName}. Your max health increased by ${ringData.value}!`);
             } else if (ringData.stat === 'maxMana') {
                 game.player.maxMana += ringData.value;
                 game.player.mana += ringData.value;
-                speak(`You equip the ${ringName}. Your Max Mana increased by ${ringData.value}!`);
+                speak(`You equip the ${ringName}. Your max mana increased by ${ringData.value}!`);
+            } else if (ringData.stat === 'attack') {
+                speak(`You equip the ${ringName}. Your attacks are now stronger!`);
             }
         }
 
@@ -527,11 +523,11 @@
                 game.dungeon.currentLevel++;
                 generateDungeon(); 
 
-                speak(`You descend to Dungeon Level ${game.dungeon.currentLevel}. The air grows colder.`, () => {
+                speak(`You descend to Dungeon Level ${game.dungeon.currentLevel}. The air grows colder and more dangerous.`, () => {
                     describeRoom();
                 });
             } else {
-                speak('There are no stairs here.');
+                speak('There are no stairs here. Find the boss room and defeat the dragon first.');
             }
         }
 
@@ -562,6 +558,7 @@
             game.player.maxMana = classData.maxMana;
             game.player.gold = classData.gold;
             game.player.inventory = [...classData.items];
+            game.player.equippedRings = [];
             game.needsClass = false;
             game.started = true;
             game.phase = 'exploration';
@@ -572,7 +569,8 @@
                 `You are now a ${classData.name}.`,
                 `Health: ${classData.health}.`,
                 `Mana: ${classData.mana}.`,
-                `Your adventure begins! Say 'search' to look for hidden items, or move with 'north,' 'south,' 'east,' or 'west.'`
+                `Starting gold: ${classData.gold}.`,
+                `Your adventure begins!`
             ], () => {
                 setTimeout(() => describeRoom(), 1000);
             });
@@ -604,7 +602,7 @@
                             type: 'entrance', 
                             description: getRandomDescription('entrance'),
                             ...roomData,
-                            hasEnemy: roomTypes.entrance.hasEnemy // Explicitly set
+                            searched: false
                         };
                     } else if (x === size - 1 && y === size - 1) { 
                         game.dungeon.grid[key] = {
@@ -612,15 +610,13 @@
                             description: getRandomDescription('boss'),
                             ...roomData,
                             hasChest: true,
-                            hasEnemy: roomTypes.boss.hasEnemy, // Explicitly set
                             enemy: { ...enemies.dragon }
                         };
                     } else if (x === size - 1 && y === size - 2) { 
                         game.dungeon.grid[key] = { 
                             type: 'stairs', 
                             description: getRandomDescription('stairs'),
-                            ...roomData,
-                            hasEnemy: roomTypes.stairs.hasEnemy // Explicitly set
+                            ...roomData 
                         };
                     } else {
                         let roomType = null;
@@ -629,39 +625,41 @@
                         const roll = Math.random();
                         
                         if (distanceFromCenter >= 7) {
-                            if (roll < 0.6) {
+                            if (roll < 0.5) {
                                 roomType = 'enemy';
                                 enemyType = Math.random() < 0.5 ? 'troll' : 'wraith';
-                            } else if (roll < 0.8) {
+                            } else if (roll < 0.7) {
                                 roomType = 'treasure';
                                 roomData.hasChest = true;
-                            } else if (roll < 0.85) {
+                            } else if (roll < 0.8) {
                                 roomType = 'fountain';
                             } else {
                                 roomType = 'crypt';
                                 roomData.hasChest = Math.random() < 0.3;
                             }
                         } else if (distanceFromCenter >= 4) {
-                            if (roll < 0.5) {
+                            if (roll < 0.45) {
                                 roomType = 'enemy';
                                 enemyType = Math.random() < 0.6 ? 'orc' : 'skeleton';
-                            } else if (roll < 0.7) {
+                            } else if (roll < 0.65) {
                                 roomType = 'treasure';
                                 roomData.hasChest = true;
                             } else if (roll < 0.75) {
                                 roomType = 'trap';
+                            } else if (roll < 0.8) {
+                                roomType = 'fountain';
                             } else {
                                 roomType = 'empty';
                                 roomData.hasChest = Math.random() < 0.2;
                             }
                         } else {
-                            if (roll < 0.3) {
+                            if (roll < 0.35) {
                                 roomType = 'enemy';
                                 enemyType = 'goblin';
-                            } else if (roll < 0.5) {
+                            } else if (roll < 0.55) {
                                 roomType = 'treasure';
                                 roomData.hasChest = true;
-                            } else if (roll < 0.55) {
+                            } else if (roll < 0.6) {
                                 roomType = 'fountain';
                             } else {
                                 roomType = 'empty';
@@ -674,15 +672,13 @@
                                 type: 'enemy',
                                 description: getRandomDescription('enemy'),
                                 ...roomData,
-                                hasEnemy: roomTypes.enemy.hasEnemy, // Explicitly set
                                 enemy: { ...enemies[enemyType] }
                             };
                         } else {
                             game.dungeon.grid[key] = {
                                 type: roomType,
                                 description: getRandomDescription(roomType),
-                                ...roomData,
-                                hasEnemy: roomTypes[roomType].hasEnemy || false // Explicitly set
+                                ...roomData
                             };
                         }
                     }
@@ -736,10 +732,10 @@
             const messages = [`You are on Level ${game.dungeon.currentLevel} in ${room.description}`];
             
             if (room.type === 'stairs') {
-                messages.push('Dark stairs descend deeper. Say "go down" to descend.');
+                messages.push('Dark stairs descend deeper. Say "go down stairs" to descend.');
             } else if (room.type === 'fountain' && !room.fountainUsed) {
                 messages.push('A magical fountain bubbles here. Say "drink fountain" to be healed.');
-            } else if (room.hasEnemy && room.enemy && room.enemy.health > 0) {
+            } else if (room.enemy && room.enemy.health > 0) {
                 messages.push(`A ${room.enemy.name} blocks your path!`);
                 speakSequence(messages, () => {
                     setTimeout(() => startCombat(room.enemy), 1000);
@@ -747,9 +743,9 @@
                 return;
             } else {
                 if (room.hasChest && !room.searched) {
-                    messages.push('A treasure chest glimmers in the shadows.');
+                    messages.push('A treasure chest glimmers in the shadows. Say "open chest" to loot it.');
                 }
-                if (!room.searched && room.type !== 'entrance') {
+                if (!room.searched && room.type !== 'stairs') {
                     messages.push('You could search this room.');
                 }
             }
@@ -804,7 +800,7 @@
                     speak(`You found a hidden ${loot.item}!`);
                 } else if (loot.type === 'ring') {
                     game.player.inventory.push(loot.item);
-                    speak(`You found a mystical ${loot.item}! Say 'wear ring' followed by 'health,' 'mana,' or 'protection' to equip it.`);
+                    speak(`You found a mystical ${loot.item}! Say 'wear ring' to equip it.`);
                 } else {
                     speak('You search carefully but find nothing of value.');
                 }
@@ -942,7 +938,8 @@
 
         function playerAttack() {
             const baseDamage = 15;
-            const damage = baseDamage + Math.floor(Math.random() * 15);
+            const ringBonus = game.player.equippedRings.includes('Ring of Strength') ? 2 : 0;
+            const damage = baseDamage + ringBonus + Math.floor(Math.random() * 15);
             game.combat.enemy.health -= damage;
             
             speakSequence([
@@ -1124,7 +1121,6 @@
             const classData = classes[game.player.class];
             const special = classData.special;
             const specialInfo = special.type === 'damage' ? `Deals ${special.damage} damage.` : `Restores ${special.heal} health.`;
-            const equippedRings = game.player.inventory.filter(i => i.startsWith('(E)'));
             const expNeeded = game.player.experienceToNext - game.player.experience;
 
             let messages = [
@@ -1136,29 +1132,34 @@
                 `Gold: ${game.player.gold}.`,
             ];
 
-            if (equippedRings.length > 0) {
-                messages.push(`Equipped: ${equippedRings.join(', ').replace(/\(E\)\s*/g, '')}.`);
+            if (game.player.equippedRings.length > 0) {
+                messages.push(`Equipped rings: ${game.player.equippedRings.join(', ')}.`);
             } else {
-                 messages.push(`Equipped: Nothing.`);
+                messages.push(`No rings equipped.`);
             }
 
             speakSequence(messages);
         }
 
         function listInventory() {
-            if (game.player.inventory.length === 0) {
+            if (game.player.inventory.length === 0 && game.player.equippedRings.length === 0) {
                 speak(`Empty inventory. Gold: ${game.player.gold}.`);
             } else {
                 const healthPotions = game.player.inventory.filter(i => i === 'Health Potion').length;
                 const manaPotions = game.player.inventory.filter(i => i === 'Mana Potion').length;
-                const ringsList = game.player.inventory.filter(i => rings.some(r => r.name === i) || i.startsWith('(E)'));
-                const otherItems = game.player.inventory.filter(i => i !== 'Health Potion' && i !== 'Mana Potion' && !ringsList.includes(i));
+                const ringsList = game.player.inventory.filter(i => rings.some(r => r.name === i));
+                const otherItems = game.player.inventory.filter(i => 
+                    i !== 'Health Potion' && 
+                    i !== 'Mana Potion' && 
+                    !ringsList.includes(i)
+                );
                 
                 const messages = ['Inventory:'];
                 if (healthPotions > 0) messages.push(`${healthPotions} health potion${healthPotions > 1 ? 's' : ''}.`);
                 if (manaPotions > 0) messages.push(`${manaPotions} mana potion${manaPotions > 1 ? 's' : ''}.`);
-                if (ringsList.length > 0) messages.push(`Rings: ${ringsList.join(', ')}.`);
-                if (otherItems.length > 0) messages.push(otherItems.join(', ') + '.');
+                if (ringsList.length > 0) messages.push(`Unequipped rings: ${ringsList.join(', ')}.`);
+                if (game.player.equippedRings.length > 0) messages.push(`Equipped rings: ${game.player.equippedRings.join(', ')}.`);
+                if (otherItems.length > 0) messages.push(`Equipment: ${otherItems.join(', ')}.`);
                 messages.push(`Gold: ${game.player.gold}.`);
                 
                 speakSequence(messages);
@@ -1169,7 +1170,7 @@
             if (game.phase === 'combat') {
                 speak('Combat commands: attack, defend, special, use potion, or flee.');
             } else {
-                speak('Exploration commands: north, south, east, west, look around, search, open chest, drink fountain, meditate, wear ring health, wear ring mana, wear ring protection, go down, status, inventory, save game, load game, or repeat.');
+                speak('Exploration commands: north, south, east, west, look around, search, open chest, drink fountain, meditate, wear ring, go down stairs, status, inventory, save game, or load game.');
             }
         }
 
@@ -1185,9 +1186,9 @@
                 ]);
             } else {
                 speakSequence([
-                    'Movement: north, south, east, west, go down for stairs.',
-                    'Actions: look around, search, open chest, drink fountain, meditate, wear ring health, wear ring mana, wear ring protection.',
-                    'Info: status, inventory, hint, repeat.',
+                    'Movement: north, south, east, west, go down stairs.',
+                    'Actions: look around, search, open chest, drink fountain, meditate, wear ring.',
+                    'Info: status, inventory, hint.',
                     'System: save game, load game, commands, help.'
                 ]);
             }
@@ -1205,7 +1206,7 @@
             } else {
                 const room = game.currentRoom;
                 if (room.type === 'stairs') {
-                     speak('A staircase is here. Say "go down" to descend to the next level.');
+                    speak('A staircase is here. Say "go down stairs" to descend to the next level.');
                 } else if (room.type === 'fountain' && !room.fountainUsed) {
                     speak('There is a magical fountain here. Say "drink fountain" for full healing.');
                 } else if (room.hasChest && !room.searched) {
@@ -1217,7 +1218,7 @@
                 } else if (room.type === 'boss') {
                     speak('This is a boss room. Be prepared for a tough fight.');
                 } else {
-                    speak('Explore in different directions. The boss is at the far south east corner, coordinates 9, 9.');
+                    speak('Explore in different directions. The boss is at the far south east corner.');
                 }
             }
         }
