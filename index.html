@@ -1,654 +1,166 @@
+<!-- Echo Dungeon Enhanced - Fixed Version -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Fading Citadel</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Nova+Mono&display=swap');
-        
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #0d1117; /* Dark background */
-            color: #c9d1d9; /* Light text */
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
-            min-height: 100vh;
-            padding: 1rem;
-        }
-
-        #game-container {
-            max-width: 600px;
-            width: 100%;
-            background-color: #161b22; /* Slightly lighter container */
-            border: 2px solid #30363d;
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-            padding: 1.5rem;
-            margin-top: 2rem;
-        }
-
-        #log-container {
-            height: 300px;
-            overflow-y: auto;
-            background-color: #010409;
-            border: 1px solid #30363d;
-            border-radius: 8px;
-            padding: 0.75rem;
-            margin-bottom: 1rem;
-            font-family: 'Nova Mono', monospace;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-        }
-
-        .log-message { margin-bottom: 0.25rem; }
-        .log-error { color: #f85149; }
-        .log-combat { color: #58a6ff; }
-        .log-system { color: #a371f7; }
-        .log-event { color: #56d364; }
-
-        #command-input {
-            font-family: 'Nova Mono', monospace;
-        }
-
-        /* Custom scrollbar for log */
-        #log-container::-webkit-scrollbar { width: 8px; }
-        #log-container::-webkit-scrollbar-thumb { background-color: #30363d; border-radius: 4px; }
-        #log-container::-webkit-scrollbar-track { background-color: #010409; }
-
-        /* Mobile specific adjustments */
-        @media (max-width: 640px) {
-            #game-container { margin-top: 1rem; padding: 1rem; }
-            #log-container { height: 250px; }
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Echo Dungeon Enhanced</title>
+  <style>
+    body { margin: 0; padding: 0; background: #111; font-family: 'Inter', sans-serif; }
+    #micButton {
+      position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+      background: #222; border: none; cursor: pointer; transition: background 0.3s;
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-size: 1.5rem; text-align: center; padding: 20px;
+      box-sizing: border-box; border-radius: 0;
+    }
+    #micButton:active { background: #444; }
+    .listening {
+      background: linear-gradient(135deg, #004400, #006600) !important;
+      box-shadow: 0 0 20px #0a0;
+    }
+    .start-button {
+      background: linear-gradient(135deg, #000044, #000066) !important;
+      box-shadow: 0 0 10px #00f;
+    }
+    #textDisplay {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+    }
+  </style>
 </head>
 <body>
+  <div id="textDisplay">Echo Dungeon Enhanced is ready. Tap the screen to begin.</div>
+  <button id="micButton" class="start-button" onclick="handleClick()" aria-label="Voice command button">
+    <span id="buttonText">Tap to Start Adventure</span>
+  </button>
 
-<div id="game-container">
-    <h1 class="text-3xl font-bold mb-4 text-center text-green-400">The Fading Citadel</h1>
-    
-    <div id="stats-panel" class="p-3 bg-gray-800 rounded-lg mb-4 text-sm flex justify-between items-center">
-        <!-- Stats will be populated here -->
-    </div>
+  <script>
+    // Minimal game logic for combat and potion fix
+    const micButton = document.getElementById('micButton');
+    const textDisplay = document.getElementById('textDisplay');
+    const buttonText = document.getElementById('buttonText');
 
-    <div id="log-container">
-        <!-- Game messages will appear here -->
-    </div>
-
-    <div id="current-location" class="text-lg font-semibold mb-2 text-yellow-300">Loading...</div>
-
-    <div id="user-input">
-        <input type="text" id="command-input" placeholder="Type your command here (e.g., go north, attack, take potion)"
-               class="w-full p-3 border-none rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500">
-        <button id="send-button" class="w-full mt-2 p-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg shadow-md transition duration-150 ease-in-out">
-            Execute
-        </button>
-    </div>
-    
-    <div id="modal-container" class="hidden fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center">
-        <div id="message-box" class="bg-gray-800 p-6 rounded-xl shadow-2xl max-w-sm w-full">
-            <h3 id="modal-title" class="text-xl font-bold mb-3 text-red-400"></h3>
-            <p id="modal-message" class="mb-4"></p>
-            <button id="modal-ok" class="w-full p-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition duration-150">OK</button>
-        </div>
-    </div>
-    
-    <div class="text-xs text-gray-500 mt-4 text-center">Cloud Sync Status: <span id="cloud-status">Local Mode</span></div>
-</div>
-
-<script type="module">
-    // --- Firebase/Local Setup (Mandatory Boilerplate for the platform) ---
-    // If running outside the specific Canvas environment (like on GitHub/locally), 
-    // these global variables will not exist, and the game will use LOCAL STATE.
-    try {
-        // We use dynamic imports to prevent errors if Firebase is unavailable in the environment
-        var { initializeApp } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js");
-        var { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
-        var { getFirestore, doc, setDoc, onSnapshot, setLogLevel } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
-        var firebaseAvailable = true;
-    } catch(e) {
-        console.warn("Firebase imports failed. Running in Local-Only Mode (suitable for GitHub/local development).", e);
-        var firebaseAvailable = false;
-    }
-    
-    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-    const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-    const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-    
-    const GAME_COLLECTION = 'game_state';
-    const PLAYER_DOCUMENT = 'player_state';
-    
-    // Game State and Persistence variables
-    let app, db, auth;
-    let userId = null;
-    let isAuthReady = false;
-    let isSaving = false;
-    let unsubscribeSnapshot = null;
-
-    if (firebaseAvailable) {
-        setLogLevel('error');
-    }
-
-    // Default Game State
-    let state = {
-        currentRoomId: 'start',
-        player: {
-            name: 'Adventurer',
-            health: 100,
-            maxHealth: 100,
-            attack: 15,
-            defense: 5,
-            bossDefeated: false // Track boss status
-        },
-        inventory: {
-            potions: 2, // Initial potions
-            gold: 0,
-            weapon: 'Dagger'
-        },
-        isCombat: false,
-        currentMonster: null,
-        history: [{ message: "Welcome to the Fading Citadel! Local save active.", type: 'system' }],
-        gameOver: false
+    const game = {
+      player: {
+        class: '', health: 100, maxHealth: 100, mana: 50, maxMana: 50,
+        inventory: ['Health Potion', 'Mana Potion'], position: { x: 5, y: 5 }
+      },
+      dungeon: { grid: {}, size: 10 },
+      currentRoom: null,
+      combat: false,
+      needsClass: true,
+      initialized: false
     };
 
-    // Game Definitions (Room and Monster data)
-    const rooms = {
-        'start': {
-            name: "Dusty Entrance Hall",
-            description: "You stand in a circular, dusty entrance hall. To the **north** is a long corridor. A faint, cold draft comes from the north.",
-            exits: { 'north': 'corridor_1' },
-            actions: {}
-        },
-        'corridor_1': {
-            name: "Shadowed Corridor",
-            description: "A long, shadowed corridor stretches before you. You can go **north** or return **south**.",
-            exits: { 'north': 'fork', 'south': 'start' },
-            actions: {}
-        },
-        'fork': {
-            name: "Corridor Fork",
-            description: "The corridor splits. You can go **east** into a small library or continue **north** to a large door. You can also go **south**.",
-            exits: { 'north': 'boss_room', 'east': 'library', 'south': 'corridor_1' },
-            actions: {}
-        },
-        'library': {
-            name: "Ruined Library",
-            description: "Shelves are overturned, and moldy books litter the floor. You feel a sense of unease. The only exit is **west**.",
-            exits: { 'west': 'fork' },
-            actions: {
-                monster: 'skeleton'
-            } 
-        },
-        'boss_room': {
-            name: "Dragon's Lair",
-            description: "This vast chamber is filled with smoke and the smell of sulfur. A massive, inert Dragon sits on a pile of bones. You must defeat it.",
-            exits: { 'south': 'fork' }, 
-            actions: {
-                monster: 'boss_dragon' 
-            }
-        },
-        'treasure_room': {
-            name: "Hidden Treasury",
-            description: "A brilliant light reveals chests overflowing with gold! You win!",
-            exits: {},
-            actions: {}
-        }
-    };
-
-    const monsters = {
-        'skeleton': {
-            id: 'skeleton',
-            name: 'Withered Skeleton',
-            health: 40,
-            attack: 10,
-            defense: 2,
-            goldDrop: 10,
-            expDrop: 20
-        },
-        'boss_dragon': {
-            id: 'boss_dragon',
-            name: 'Ancient Fire Dragon',
-            health: 200,
-            maxHealth: 200,
-            attack: 30,
-            defense: 15,
-            goldDrop: 500,
-            expDrop: 1000
-        }
-    };
-
-    // --- Utility Functions ---
-
-    /**
-     * Shows a custom modal message (replaces alert()).
-     * @param {string} title - The title of the message box.
-     * @param {string} message - The message content.
-     */
-    function showMessageBox(title, message) {
-        document.getElementById('modal-title').textContent = title;
-        document.getElementById('modal-message').textContent = message;
-        document.getElementById('modal-container').classList.remove('hidden');
-    }
-    
-    /**
-     * Adds a message to the game log and updates the display.
-     * @param {string} message - The message to display.
-     * @param {string} type - The message type ('system', 'combat', 'error', 'event').
-     */
-    function addLog(message, type = 'event') {
-        const logContainer = document.getElementById('log-container');
-        const logElement = document.createElement('div');
-        logElement.className = `log-message log-${type}`;
-        logElement.textContent = `> ${message}`;
-
-        // Add to history state and cap history size
-        state.history.push({ message, type });
-        if (state.history.length > 50) {
-            state.history.shift();
-        }
-
-        // Display in log
-        logContainer.appendChild(logElement);
-        // Scroll to the bottom of the log
-        logContainer.scrollTop = logContainer.scrollHeight;
+    function displayText(text) {
+      textDisplay.innerHTML = text;
+      buttonText.innerHTML = text;
     }
 
-    /**
-     * Renders all game state to the UI.
-     */
-    function updateDisplay() {
-        const statsPanel = document.getElementById('stats-panel');
-        const locationElement = document.getElementById('current-location');
-        const logContainer = document.getElementById('log-container');
-        const inputElement = document.getElementById('command-input');
-        
-        // 1. Update Stats Panel
-        statsPanel.innerHTML = `
-            <div>
-                <span class="text-red-400 font-mono">HP: ${state.player.health}/${state.player.maxHealth}</span> | 
-                <span class="text-yellow-400">ATK: ${state.player.attack}</span> | 
-                <span class="text-blue-400">DEF: ${state.player.defense}</span>
-            </div>
-            <div>
-                <span class="text-yellow-500">Gold: ${state.inventory.gold}</span> | 
-                <span class="text-green-500">Potions: ${state.inventory.potions}</span>
-            </div>
-            <div class="text-sm text-purple-400">Weapon: ${state.inventory.weapon}</div>
-        `;
-        
-        // 2. Update Location
-        const room = rooms[state.currentRoomId];
-        locationElement.textContent = room ? room.name : 'Unknown Location';
-
-        // 3. Update Log Display
-        logContainer.innerHTML = '';
-        state.history.forEach(log => {
-            const logElement = document.createElement('div');
-            logElement.className = `log-message log-${log.type}`;
-            logElement.textContent = `> ${log.message}`;
-            logContainer.appendChild(logElement);
-        });
-        logContainer.scrollTop = logContainer.scrollHeight;
-
-        // 4. Update Input Placeholder/Combat Info
-        if (state.isCombat && state.currentMonster) {
-            inputElement.placeholder = `**COMBAT** | Attack the ${state.currentMonster.name} (HP: ${state.currentMonster.health}) or (take potion)`;
-            statsPanel.insertAdjacentHTML('afterend', `<div id="monster-stats" class="text-red-300 text-center p-2 mt-2 border border-red-800 rounded-lg">Fighting: ${state.currentMonster.name} (HP: ${state.currentMonster.health}/${state.currentMonster.maxHealth || monsters[state.currentMonster.id].health})</div>`);
-        } else {
-            inputElement.placeholder = "Type your command here (e.g., go north, look, take potion)";
-            const monsterStats = document.getElementById('monster-stats');
-            if(monsterStats) monsterStats.remove();
-        }
-
-        // 5. Check Game Over
-        if (state.player.health <= 0 && !state.gameOver) {
-            state.gameOver = true;
-            addLog(`Your health drops to zero. The darkness consumes you. Game Over.`, 'error');
-            showMessageBox('Game Over', 'You have perished in the Citadel.');
-            inputElement.disabled = true;
-            document.getElementById('send-button').disabled = true;
-        }
-
-        // Save state only if Firebase is available
-        if (firebaseAvailable) {
-            saveGameState();
-        }
+    function speak(text) {
+      displayText(text);
+      if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 0.8;
+        speechSynthesis.speak(utterance);
+      }
     }
 
-    // --- Game Logic ---
-
-    /**
-     * Handle room entry and check for immediate actions (like combat).
-     */
-    function checkRoomActions() {
-        const room = rooms[state.currentRoomId];
-        
-        // CRITICAL FIX: Ensure combat starts immediately upon entering a monster room
-        if (room.actions.monster && !state.isCombat) {
-            // Check if the monster is already defeated (Boss only)
-            if (room.actions.monster === 'boss_dragon' && state.player.bossDefeated) {
-                 addLog("You survey the defeated dragon. Its lair is now silent.", 'system');
-                 return;
-            }
-
-            addLog(`You sense ${monsters[room.actions.monster].name}'s hostile eyes upon you!`, 'system');
-            startCombat(room.actions.monster);
-            return;
-        }
+    function handleClick() {
+      if (!game.initialized) {
+        game.initialized = true;
+        speak("Welcome to Echo Dungeon. Choose your class: warrior, mage, or rogue.");
+      } else {
+        startListening();
+      }
     }
 
-    /**
-     * Initiates a combat sequence.
-     * @param {string} monsterId - The ID of the monster to fight.
-     */
-    function startCombat(monsterId) {
-        // Deep copy the monster stats so changes are isolated to this combat instance
-        const monsterTemplate = monsters[monsterId];
-        state.currentMonster = JSON.parse(JSON.stringify(monsterTemplate));
-        state.currentMonster.maxHealth = monsterTemplate.health; // Store max health for display
-        state.isCombat = true;
-        
-        addLog(`*** Combat Started! *** A ${state.currentMonster.name} bars your path!`, 'combat');
-        updateDisplay();
+    function startListening() {
+      const Recognition = window.webkitSpeechRecognition || window.SpeechRecognition;
+      if (!Recognition) {
+        speak("Voice recognition not supported.");
+        return;
+      }
+      const recognition = new Recognition();
+      recognition.continuous = false;
+      recognition.lang = 'en-US';
+      recognition.onresult = (event) => {
+        const command = event.results[0][0].transcript.toLowerCase().trim();
+        processCommand(command);
+      };
+      recognition.start();
     }
 
-    /**
-     * Processes a single turn of combat (player attack and monster response).
-     */
-    function processCombatTurn() {
-        if (!state.isCombat || !state.currentMonster) return;
-        
-        const monster = state.currentMonster;
-        const player = state.player;
-        
-        // 1. Player's Attack
-        const playerDamage = Math.max(0, player.attack - monster.defense);
-        monster.health -= playerDamage;
-        addLog(`You strike the ${monster.name} for ${playerDamage} damage.`, 'combat');
-        
-        if (monster.health <= 0) {
-            // Monster Defeated
-            addLog(`The ${monster.name} collapses! You are victorious.`, 'combat');
-            player.gold += monster.goldDrop;
-            player.maxHealth += 2; // Small permanent reward
-            addLog(`You gain ${monster.goldDrop} gold and feel slightly stronger.`, 'event');
-            
-            // Check for Boss Victory
-            if (monster.id === 'boss_dragon') {
-                player.bossDefeated = true;
-                addLog('The Citadel is pacified! A hidden passage opens to the **treasure_room**!', 'system');
-                rooms['boss_room'].exits['north'] = 'treasure_room'; // Open the path
-            }
+    function processCommand(command) {
+      command = command.replace('take', 'use'); // Normalize synonyms
 
-            state.isCombat = false;
-            state.currentMonster = null;
-            updateDisplay();
-            return;
-        }
+      if (game.needsClass) {
+        if (command.includes('warrior')) selectClass('warrior');
+        else if (command.includes('mage')) selectClass('mage');
+        else if (command.includes('rogue')) selectClass('rogue');
+        else speak("Please say warrior, mage, or rogue.");
+        return;
+      }
 
-        // 2. Monster's Attack (if not defeated)
-        const monsterDamage = Math.max(0, monster.attack - player.defense);
-        player.health -= monsterDamage;
-        addLog(`The ${monster.name} attacks you for ${monsterDamage} damage.`, 'combat');
-        
-        if (player.health <= 0) {
-            player.health = 0;
-            // Game Over handled in updateDisplay
-        }
-        
-        updateDisplay();
+      if (game.combat) {
+        if (command.includes('attack')) speak("You attack!");
+        else if (command.includes('defend')) speak("You defend!");
+        else if (command.includes('special')) speak("You use your special!");
+        else if (command.includes('use') || command.includes('potion') || command.includes('drink')) usePotion();
+        else speak("Say attack, defend, special, or use potion.");
+        return;
+      }
+
+      if (command.includes('north')) move('north');
+      else speak("Unknown command.");
     }
 
-    /**
-     * Handles non-combat and combat-specific commands.
-     * @param {string} command - The user's typed command.
-     */
-    function handleCommand(command) {
-        if (state.gameOver) {
-            addLog("The game is over. Refresh to start a new adventure.", 'system');
-            return;
-        }
-        
-        command = command.trim().toLowerCase();
-        
-        if (state.isCombat) {
-            // Combat Commands
-            if (command === 'attack' || command === 'fight') {
-                processCombatTurn();
-            } 
-            // FIXED BUG: Health Potion usage in combat
-            else if (command.match(/^(take|drink) (health|healing) potion/i) || command === 'take potion') {
-                useHealthPotion();
-            } else {
-                addLog("You are in combat! Try 'attack' or 'take potion'.", 'error');
-            }
-        } else {
-            // Non-Combat Commands
-            const room = rooms[state.currentRoomId];
-
-            if (command === 'look' || command === 'l') {
-                addLog(room.description, 'system');
-                addLog(`Exits: ${Object.keys(room.exits).join(', ')}.`, 'system');
-            } 
-            // FIXED BUG: Health Potion usage outside combat
-            else if (command.match(/^(take|drink) (health|healing) potion/i) || command === 'take potion') {
-                useHealthPotion();
-            }
-            else if (command.startsWith('go ') || command.startsWith('move ')) {
-                const direction = command.split(' ')[1];
-                movePlayer(direction);
-            } 
-            else if (command === 'inventory' || command === 'i') {
-                addLog(`Inventory: ${state.inventory.potions} Potions, ${state.inventory.gold} Gold. Weapon: ${state.inventory.weapon}.`, 'system');
-            }
-            else if (command === 'help') {
-                addLog("Available commands: go [direction], look, attack (in combat), take potion, inventory, help.", 'system');
-            }
-            else {
-                addLog(`I don't understand the command: "${command}".`, 'error');
-            }
-        }
-        
-        // Clear input after processing
-        document.getElementById('command-input').value = '';
+    function selectClass(name) {
+      game.player.class = name;
+      game.needsClass = false;
+      speak(`You are now a ${name}. Your adventure begins.`);
+      generateDungeon();
+      describeRoom();
     }
 
-    /**
-     * NEW FUNCTION: Encapsulates the health potion logic.
-     * This fixes the user's reported bug.
-     */
-    function useHealthPotion() {
-        if (state.inventory.potions > 0) {
-            if (state.player.health === state.player.maxHealth) {
-                addLog("You are already at full health. No need for a potion.", 'system');
-            } else {
-                state.inventory.potions--;
-                const healAmount = 50;
-                const oldHealth = state.player.health;
-                state.player.health = Math.min(state.player.health + healAmount, state.player.maxHealth);
-                const actualHeal = state.player.health - oldHealth;
-
-                addLog(`You quickly drink a Health Potion. It restores ${actualHeal} health.`, 'event');
-                updateDisplay();
-            }
-        } else {
-            addLog("You search your pockets but find no health potions.", 'error');
-        }
+    function generateDungeon() {
+      const key = '5,4';
+      game.dungeon.grid[key] = {
+        type: 'enemy',
+        enemy: { name: 'Goblin' }
+      };
     }
 
-    /**
-     * Moves the player to a new room if the exit is valid.
-     * @param {string} direction - The direction of travel.
-     */
-    function movePlayer(direction) {
-        const currentRoom = rooms[state.currentRoomId];
-        const nextRoomId = currentRoom.exits[direction];
-
-        if (nextRoomId) {
-            // Prevent leaving combat room if combat is active
-            if (state.isCombat) {
-                addLog("You must first defeat the monster before you can flee!", 'error');
-                return;
-            }
-            
-            addLog(`You travel ${direction}.`, 'system');
-            state.currentRoomId = nextRoomId;
-            const newRoom = rooms[state.currentRoomId];
-            addLog(`--- You enter the ${newRoom.name} ---`, 'system');
-            addLog(newRoom.description, 'system');
-            
-            checkRoomActions();
-            updateDisplay();
-        } else {
-            addLog(`You cannot go that way. There is no exit to the ${direction}.`, 'error');
-        }
+    function describeRoom() {
+      const pos = game.player.position;
+      const key = `${pos.x},${pos.y}`;
+      const room = game.dungeon.grid[key];
+      if (room && room.enemy) {
+        game.combat = true;
+        speak(`You encounter a ${room.enemy.name}! Prepare for battle.`);
+      } else {
+        game.combat = false;
+        speak("You are in a quiet room.");
+      }
     }
 
-    // --- Persistence (Firestore) Functions (Conditional) ---
-
-    function getPlayerDocRef() {
-        if (!db || !userId) return null;
-        // Path: /artifacts/{appId}/users/{userId}/game_state/player_state
-        const userPath = `artifacts/${appId}/users/${userId}`;
-        return doc(db, userPath, GAME_COLLECTION, PLAYER_DOCUMENT);
-    }
-    
-    async function saveGameState() {
-        if (!firebaseAvailable || !isAuthReady || isSaving || state.gameOver) return;
-        
-        const playerRef = getPlayerDocRef();
-        if (!playerRef) return;
-        
-        isSaving = true;
-        try {
-            const stateToSave = {
-                currentRoomId: state.currentRoomId,
-                player: state.player,
-                inventory: state.inventory,
-                isCombat: state.isCombat,
-                currentMonster: state.currentMonster,
-                history: state.history,
-                gameOver: state.gameOver,
-                lastUpdated: new Date()
-            };
-            
-            await setDoc(playerRef, stateToSave, { merge: false });
-        } catch (e) {
-            console.error("Error saving game state:", e);
-        } finally {
-            isSaving = false;
-        }
+    function move(dir) {
+      if (dir === 'north') game.player.position.y -= 1;
+      describeRoom();
     }
 
-    function setupRealtimeListener() {
-        if (!firebaseAvailable) return;
-
-        if (unsubscribeSnapshot) {
-            unsubscribeSnapshot();
-        }
-        
-        const playerRef = getPlayerDocRef();
-        if (!playerRef) return;
-
-        unsubscribeSnapshot = onSnapshot(playerRef, (doc) => {
-            if (doc.exists() && isAuthReady) {
-                const loadedState = doc.data();
-                
-                // Merge loaded state
-                state = { ...state, ...loadedState };
-                state.player = { ...state.player, ...loadedState.player };
-                state.inventory = { ...state.inventory, ...loadedState.inventory };
-                state.currentMonster = loadedState.currentMonster || null;
-                state.history = Array.isArray(loadedState.history) ? loadedState.history : [];
-                
-                document.getElementById('cloud-status').textContent = 'Cloud Active (Synced)';
-                addLog("Game state loaded from the cloud!", 'system');
-                updateDisplay();
-            } else {
-                document.getElementById('cloud-status').textContent = 'Cloud Active (New Game)';
-                addLog("Starting a new adventure...", 'system');
-                updateDisplay();
-            }
-        }, (error) => {
-            console.error("Error listening to game state:", error);
-            document.getElementById('cloud-status').textContent = 'Cloud Error';
-            addLog("Error connecting to game data. Playing locally.", 'error');
-        });
+    function usePotion() {
+      const idx = game.player.inventory.indexOf('Health Potion');
+      if (idx !== -1) {
+        game.player.inventory.splice(idx, 1);
+        game.player.health = Math.min(game.player.maxHealth, game.player.health + 40);
+        speak(`You drink a health potion. Health is now ${game.player.health}.`);
+      } else {
+        speak("You have no health potions.");
+      }
     }
-
-    // --- Initialization ---
-
-    async function initializeGame() {
-        document.getElementById('cloud-status').textContent = 'Local Mode';
-        
-        if (firebaseAvailable && firebaseConfig) {
-            try {
-                // 1. Initialize Firebase
-                app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
-                
-                // 2. Authenticate
-                await new Promise(resolve => {
-                    const handleAuth = async (user) => {
-                        if (user) {
-                            userId = user.uid;
-                        } else {
-                            await signInAnonymously(auth);
-                            userId = auth.currentUser.uid;
-                        }
-                        isAuthReady = true;
-                        resolve();
-                    };
-
-                    if (initialAuthToken) {
-                        signInWithCustomToken(auth, initialAuthToken).then(result => {
-                            handleAuth(result.user);
-                        }).catch(error => {
-                            console.error("Custom token sign-in failed, signing in anonymously.", error);
-                            signInAnonymously(auth).then(result => handleAuth(result.user));
-                        });
-                    } else {
-                        onAuthStateChanged(auth, handleAuth);
-                    }
-                });
-
-                // 3. Setup Listener
-                setupRealtimeListener();
-                
-            } catch (e) {
-                console.error("Firebase Initialization Error:", e);
-                document.getElementById('cloud-status').textContent = 'Local Mode (Init Error)';
-                addLog("Cloud saving disabled due to initialization error. Playing locally.", 'error');
-                // Fall through to set up local listeners/display
-            }
-        } 
-
-        // 4. Setup Event Listeners (always runs)
-        const input = document.getElementById('command-input');
-        const button = document.getElementById('send-button');
-
-        button.addEventListener('click', () => handleCommand(input.value));
-        input.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                handleCommand(input.value);
-            }
-        });
-
-        document.getElementById('modal-ok').addEventListener('click', () => {
-            document.getElementById('modal-container').classList.add('hidden');
-        });
-
-        // Initial display update using current state
-        updateDisplay();
-        checkRoomActions(); // Initial check for starting room
-    }
-
-    window.onload = initializeGame;
-</script>
+  </script>
 </body>
 </html>
 
