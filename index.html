@@ -65,7 +65,7 @@
             browserSupport.https = window.location.protocol === 'https:' || window.location.hostname === 'localhost';
             browserSupport.speechSynthesis = !!(window.speechSynthesis && window.SpeechSynthesisUtterance);
             browserSupport.speechRecognition = !!(window.webkitSpeechRecognition || window.SpeechRecognition);
-            console.log('Browser Support:', browserSupport); // CHANGE: Added debug log
+            console.log('Browser Support:', browserSupport);
         }
 
         const game = {
@@ -296,7 +296,7 @@
                 };
                 recognition.onresult = (event) => {
                     const command = event.results[0][0].transcript.toLowerCase().trim();
-                    console.log('Recognized command:', command); // CHANGE: Added debug log
+                    console.log('Recognized command:', command);
                     displayText(`You said: "${command}"`);
                     stopListening();
                     setTimeout(() => processCommand(command), 500);
@@ -304,11 +304,11 @@
                 recognition.onerror = (event) => {
                     stopListening();
                     if (event.error === 'no-speech') {
-                        speak('No speech detected. Please say your command clearly.'); // CHANGE: Improved error message
+                        speak('No speech detected. Please say your command clearly.');
                     } else if (event.error === 'aborted') {
                         speak('Voice input was aborted. Try again.');
                     } else {
-                        speak(`Voice error: ${event.error}. Use Chrome for best results and ensure a clear microphone.`); // CHANGE: Improved error message
+                        speak(`Voice error: ${event.error}. Use Chrome for best results and ensure a clear microphone.`);
                     }
                 };
                 recognition.onend = () => stopListening();
@@ -375,7 +375,7 @@
         function initializeGame() {
             game.initialized = true;
             micButton.classList.remove('start-button');
-            speak("Welcome to Echo Dungeon Enhanced! First, choose your class by saying 'warrior,' 'mage,' or 'rogue.' Or say 'load game' with a save code."); // CHANGE: Clarified initial prompt
+            speak("Welcome to Echo Dungeon Enhanced! First, choose your class by saying 'warrior,' 'mage,' or 'rogue.' Or say 'load game' with a save code.");
         }
 
         function handleClick() {
@@ -387,7 +387,7 @@
         }
 
         function processCommand(command) {
-            console.log('Processing command:', command, 'Game State:', { // CHANGE: Added debug log
+            console.log('Processing command:', command, 'Game State:', {
                 needsClass: game.needsClass,
                 combat: !!game.combat,
                 phase: game.phase
@@ -431,19 +431,18 @@
             else if (command.includes('inventory') || command.includes('items')) listInventory();
             else if (command.includes('commands') || command.includes('what can i')) listCommands();
             else if (command.includes('hint')) giveHint();
-            else if (command.includes('north') || command.includes('go north') || command.includes('move north')) move('north'); // CHANGE: Added synonyms
-            else if (command.includes('south') || command.includes('go south') || command.includes('move south')) move('south'); // CHANGE: Added synonyms
-            else if (command.includes('east') || command.includes('go east') || command.includes('move east')) move('east'); // CHANGE: Added synonyms
-            else if (command.includes('west') || command.includes('go west') || command.includes('move west')) move('west'); // CHANGE: Added synonyms
+            else if (command.includes('north') || command.includes('go north') || command.includes('move north')) move('north');
+            else if (command.includes('south') || command.includes('go south') || command.includes('move south')) move('south');
+            else if (command.includes('east') || command.includes('go east') || command.includes('move east')) move('east');
+            else if (command.includes('west') || command.includes('go west') || command.includes('move west')) move('west');
             else if (command.includes('meditate') || command.includes('rest')) meditate(); 
             else if (command.includes('look') || command.includes('around')) describeRoom();
-            else if (command.includes('search') || command.includes('look for') || command.includes('find')) searchRoom(); // CHANGE: Added synonyms for search
+            else if (command.includes('search') || command.includes('look for') || command.includes('find')) searchRoom();
             else if (command.includes('open chest') || command.includes('chest')) openChest();
             else if (command.includes('fountain') || command.includes('drink water')) useFountain();
             else if (command.includes('stairs') || command.includes('go down') || command.includes('descend')) useStairs();
             else if (command.includes('wear ring') || command.includes('equip ring')) equipRing(command);
-            else if (command.includes('help')) showHelp();
-            else if (command.includes('repeat')) { // CHANGE: Added repeat command
+            else if (command.includes('repeat')) {
                 if (game.combat) {
                     listCommands();
                 } else {
@@ -483,9 +482,9 @@
         }
 
         function equipRing(command) {
-            const ringName = command.includes('health') ? 'Ring of Minor Health' :
-                             command.includes('mana') ? 'Ring of Minor Mana' :
-                             command.includes('protection') ? 'Ring of Protection' : null;
+            const ringName = (command.includes('health') || command.includes('heal') || command.includes('healthy')) ? 'Ring of Minor Health' :
+                             (command.includes('mana') || command.includes('magic')) ? 'Ring of Minor Mana' :
+                             (command.includes('protection') || command.includes('protect')) ? 'Ring of Protection' : null;
 
             if (!ringName) {
                 speak('Which ring? Say the type: health, mana, or protection.');
@@ -494,13 +493,13 @@
 
             const ringIndex = game.player.inventory.indexOf(ringName);
             if (ringIndex === -1) {
-                speak(`You do not have a ${ringName}.`);
+                speak(`You do not have a ${ringName}. Say 'inventory' to check your items.`);
                 return;
             }
 
             const ringData = rings.find(r => r.name === ringName);
             if (!ringData) {
-                 speak(`Error: Ring data not found.`);
+                speak(`Error: Ring data not found.`);
                 return;
             }
 
@@ -573,7 +572,7 @@
                 `You are now a ${classData.name}.`,
                 `Health: ${classData.health}.`,
                 `Mana: ${classData.mana}.`,
-                `Your adventure begins! Say 'search' to look for hidden items, or move with 'north,' 'south,' 'east,' or 'west.'` // CHANGE: Added guidance
+                `Your adventure begins! Say 'search' to look for hidden items, or move with 'north,' 'south,' 'east,' or 'west.'`
             ], () => {
                 setTimeout(() => describeRoom(), 1000);
             });
@@ -604,7 +603,8 @@
                         game.dungeon.grid[key] = { 
                             type: 'entrance', 
                             description: getRandomDescription('entrance'),
-                            ...roomData 
+                            ...roomData,
+                            hasEnemy: roomTypes.entrance.hasEnemy // Explicitly set
                         };
                     } else if (x === size - 1 && y === size - 1) { 
                         game.dungeon.grid[key] = {
@@ -612,13 +612,15 @@
                             description: getRandomDescription('boss'),
                             ...roomData,
                             hasChest: true,
+                            hasEnemy: roomTypes.boss.hasEnemy, // Explicitly set
                             enemy: { ...enemies.dragon }
                         };
                     } else if (x === size - 1 && y === size - 2) { 
                         game.dungeon.grid[key] = { 
                             type: 'stairs', 
                             description: getRandomDescription('stairs'),
-                            ...roomData 
+                            ...roomData,
+                            hasEnemy: roomTypes.stairs.hasEnemy // Explicitly set
                         };
                     } else {
                         let roomType = null;
@@ -672,13 +674,15 @@
                                 type: 'enemy',
                                 description: getRandomDescription('enemy'),
                                 ...roomData,
+                                hasEnemy: roomTypes.enemy.hasEnemy, // Explicitly set
                                 enemy: { ...enemies[enemyType] }
                             };
                         } else {
                             game.dungeon.grid[key] = {
                                 type: roomType,
                                 description: getRandomDescription(roomType),
-                                ...roomData
+                                ...roomData,
+                                hasEnemy: roomTypes[roomType].hasEnemy || false // Explicitly set
                             };
                         }
                     }
@@ -800,7 +804,7 @@
                     speak(`You found a hidden ${loot.item}!`);
                 } else if (loot.type === 'ring') {
                     game.player.inventory.push(loot.item);
-                    speak(`You found a mystical ${loot.item}! Say 'wear ring' to equip it.`);
+                    speak(`You found a mystical ${loot.item}! Say 'wear ring' followed by 'health,' 'mana,' or 'protection' to equip it.`);
                 } else {
                     speak('You search carefully but find nothing of value.');
                 }
@@ -1165,7 +1169,7 @@
             if (game.phase === 'combat') {
                 speak('Combat commands: attack, defend, special, use potion, or flee.');
             } else {
-                speak('Exploration commands: north, south, east, west, look around, search, open chest, drink fountain, meditate, wear ring, go down, status, inventory, save game, or load game.');
+                speak('Exploration commands: north, south, east, west, look around, search, open chest, drink fountain, meditate, wear ring health, wear ring mana, wear ring protection, go down, status, inventory, save game, load game, or repeat.');
             }
         }
 
@@ -1182,8 +1186,8 @@
             } else {
                 speakSequence([
                     'Movement: north, south, east, west, go down for stairs.',
-                    'Actions: look around, search, open chest, drink fountain, meditate, wear ring.',
-                    'Info: status, inventory, hint.',
+                    'Actions: look around, search, open chest, drink fountain, meditate, wear ring health, wear ring mana, wear ring protection.',
+                    'Info: status, inventory, hint, repeat.',
                     'System: save game, load game, commands, help.'
                 ]);
             }
