@@ -65,6 +65,7 @@
             browserSupport.https = window.location.protocol === 'https:' || window.location.hostname === 'localhost';
             browserSupport.speechSynthesis = !!(window.speechSynthesis && window.SpeechSynthesisUtterance);
             browserSupport.speechRecognition = !!(window.webkitSpeechRecognition || window.SpeechRecognition);
+            console.log('Browser Support:', browserSupport); // CHANGE: Added debug log
         }
 
         const game = {
@@ -280,7 +281,7 @@
 
         function startListening() {
             if (!browserSupport.speechRecognition || !browserSupport.https) {
-                speak('Voice recognition requires HTTPS and a compatible browser.');
+                speak('Voice recognition requires HTTPS and a compatible browser. Please use Chrome.');
                 return;
             }
             if (game.listening) { stopListening(); return; }
@@ -295,20 +296,25 @@
                 };
                 recognition.onresult = (event) => {
                     const command = event.results[0][0].transcript.toLowerCase().trim();
+                    console.log('Recognized command:', command); // CHANGE: Added debug log
                     displayText(`You said: "${command}"`);
                     stopListening();
                     setTimeout(() => processCommand(command), 500);
                 };
                 recognition.onerror = (event) => {
                     stopListening();
-                    if (event.error !== 'no-speech' && event.error !== 'aborted') {
-                        speak('Voice error. Try again.');
+                    if (event.error === 'no-speech') {
+                        speak('No speech detected. Please say your command clearly.'); // CHANGE: Improved error message
+                    } else if (event.error === 'aborted') {
+                        speak('Voice input was aborted. Try again.');
+                    } else {
+                        speak(`Voice error: ${event.error}. Use Chrome for best results and ensure a clear microphone.`); // CHANGE: Improved error message
                     }
                 };
                 recognition.onend = () => stopListening();
                 recognition.start();
             } catch (error) {
-                speak('Failed to start voice recognition.');
+                speak('Failed to start voice recognition. Please try again.');
                 stopListening();
             }
         }
@@ -369,7 +375,7 @@
         function initializeGame() {
             game.initialized = true;
             micButton.classList.remove('start-button');
-            speak("Welcome to Echo Dungeon Enhanced! Say 'load game' and provide your save code, or choose your class: warrior, mage, or rogue."); 
+            speak("Welcome to Echo Dungeon Enhanced! First, choose your class by saying 'warrior,' 'mage,' or 'rogue.' Or say 'load game' with a save code."); // CHANGE: Clarified initial prompt
         }
 
         function handleClick() {
@@ -381,6 +387,12 @@
         }
 
         function processCommand(command) {
+            console.log('Processing command:', command, 'Game State:', { // CHANGE: Added debug log
+                needsClass: game.needsClass,
+                combat: !!game.combat,
+                phase: game.phase
+            });
+            
             if (command.includes('save game') || command.includes('save')) { 
                 saveGame(); 
                 return; 
@@ -401,7 +413,7 @@
                 if (command.includes('warrior')) selectClass('warrior');
                 else if (command.includes('mage') || command.includes('wizard')) selectClass('mage'); 
                 else if (command.includes('rogue')) selectClass('rogue');
-                else speak('Please say warrior, mage, or rogue.');
+                else speak('Please say warrior, mage, or rogue to choose your class.');
                 return;
             }
 
@@ -419,19 +431,26 @@
             else if (command.includes('inventory') || command.includes('items')) listInventory();
             else if (command.includes('commands') || command.includes('what can i')) listCommands();
             else if (command.includes('hint')) giveHint();
-            else if (command.includes('north')) move('north');
-            else if (command.includes('south')) move('south');
-            else if (command.includes('east')) move('east');
-            else if (command.includes('west')) move('west');
+            else if (command.includes('north') || command.includes('go north') || command.includes('move north')) move('north'); // CHANGE: Added synonyms
+            else if (command.includes('south') || command.includes('go south') || command.includes('move south')) move('south'); // CHANGE: Added synonyms
+            else if (command.includes('east') || command.includes('go east') || command.includes('move east')) move('east'); // CHANGE: Added synonyms
+            else if (command.includes('west') || command.includes('go west') || command.includes('move west')) move('west'); // CHANGE: Added synonyms
             else if (command.includes('meditate') || command.includes('rest')) meditate(); 
             else if (command.includes('look') || command.includes('around')) describeRoom();
-            else if (command.includes('search')) searchRoom();
+            else if (command.includes('search') || command.includes('look for') || command.includes('find')) searchRoom(); // CHANGE: Added synonyms for search
             else if (command.includes('open chest') || command.includes('chest')) openChest();
             else if (command.includes('fountain') || command.includes('drink water')) useFountain();
             else if (command.includes('stairs') || command.includes('go down') || command.includes('descend')) useStairs();
             else if (command.includes('wear ring') || command.includes('equip ring')) equipRing(command);
             else if (command.includes('help')) showHelp();
-            else speak('Unknown command. Say help for options.');
+            else if (command.includes('repeat')) { // CHANGE: Added repeat command
+                if (game.combat) {
+                    listCommands();
+                } else {
+                    describeRoom();
+                }
+            }
+            else speak('Unknown command. Say help for options or try saying your command clearly.');
         }
 
         function gainExperience(exp) {
@@ -554,7 +573,7 @@
                 `You are now a ${classData.name}.`,
                 `Health: ${classData.health}.`,
                 `Mana: ${classData.mana}.`,
-                `Your adventure begins!`
+                `Your adventure begins! Say 'search' to look for hidden items, or move with 'north,' 'south,' 'east,' or 'west.'` // CHANGE: Added guidance
             ], () => {
                 setTimeout(() => describeRoom(), 1000);
             });
