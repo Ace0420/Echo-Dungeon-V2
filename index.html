@@ -93,7 +93,7 @@
                 size: 10,
                 secretRoom: null,
                 hasSecretRoom: false,
-                currentLevel: 1 
+                currentLevel: 1
             },
             currentRoom: null,
             combat: null,
@@ -115,7 +115,7 @@
                 items: ['Steel Sword', 'Health Potion', 'Health Potion', 'Chainmail'],
                 special: { name: 'Power Strike', damage: 40, cost: 15, type: 'damage' }
             },
-            mage: { 
+            mage: {
                 name: 'Mage',
                 health: 80,
                 maxHealth: 80,
@@ -123,7 +123,7 @@
                 maxMana: 100,
                 gold: 75,
                 items: ['Mystic Staff', 'Mana Potion', 'Health Potion', 'Enchanted Robes'],
-                special: { name: 'Fireball', damage: 30, cost: 20, type: 'damage' } 
+                special: { name: 'Fireball', damage: 30, cost: 20, type: 'damage' }
             },
             rogue: {
                 name: 'Rogue',
@@ -163,15 +163,15 @@
         ];
 
         const roomTypes = {
-            entrance: { 
+            entrance: {
                 descriptions: [
                     'the grand entrance hall. Torches flicker on ancient stone walls.',
                     'the entrance chamber. A faded tapestry hangs on the north wall.',
                     'the starting hall. Cobwebs drape from vaulted ceilings above.'
-                ], 
-                hasEnemy: false 
+                ],
+                hasEnemy: false
             },
-            empty: { 
+            empty: {
                 descriptions: [
                     'an abandoned barracks. Rusty weapons litter the floor.',
                     'a collapsed library. Torn pages scatter at your feet.',
@@ -181,52 +181,52 @@
                     'a meditation chamber. Stone benches circle a dry fountain.',
                     'an old prison cell. Iron bars have rusted through.',
                     'a guard post. A skeleton sits slumped in a chair.'
-                ], 
-                hasEnemy: false 
+                ],
+                hasEnemy: false
             },
-            treasure: { 
+            treasure: {
                 descriptions: [
                     'a glittering treasure vault. Gold coins reflect torchlight.',
                     'a dragon\'s hoard chamber. Piles of jewels gleam in the darkness.',
                     'a royal treasury. Ancient chests overflow with riches.',
                     'a pirate\'s cache. Stolen goods fill every corner.',
                     'a wizard\'s vault. Magical artifacts pulse with energy.'
-                ], 
-                hasEnemy: false 
+                ],
+                hasEnemy: false
             },
-            enemy: { 
+            enemy: {
                 descriptions: [
                     'a dark chamber. You sense hostile eyes watching you.',
                     'a blood-stained arena. Old battle scars mark the floor.',
                     'a shadowy lair. Something growls in the darkness.',
                     'a monster\'s den. Bones crunch beneath your feet.',
                     'a cursed chamber. An evil presence fills the air.'
-                ], 
-                hasEnemy: true 
+                ],
+                hasEnemy: true
             },
-            boss: { 
+            boss: {
                 descriptions: [
                     'the throne room of darkness. A massive beast awaits on a stone throne.',
                     'the dragon\'s lair. Heat radiates from the enormous creature before you.',
                     'the demon king\'s chamber. Dark energy swirls around your foe.'
-                ], 
-                hasEnemy: true 
+                ],
+                hasEnemy: true
             },
-            trap: { 
+            trap: {
                 descriptions: [
                     'a trapped corridor. Pressure plates cover the floor.',
                     'a spike-filled chamber. Deadly traps line the walls.',
                     'a poison gas room. Strange vapors seep from cracks.'
-                ], 
-                hasEnemy: false 
+                ],
+                hasEnemy: false
             },
-            stairs: { 
+            stairs: {
                 descriptions: [
                     'a spiral stairwell. Dark stone steps descend into deeper darkness.',
                     'a grand staircase. Ancient carvings decorate the descent.',
                     'a hidden passage. Secret stairs lead to the next level.'
-                ], 
-                hasEnemy: false 
+                ],
+                hasEnemy: false
             },
             fountain: {
                 descriptions: [
@@ -364,7 +364,8 @@
                     currentLevel: game.dungeon.currentLevel,
                     size: game.dungeon.size,
                     hasSecretRoom: game.dungeon.hasSecretRoom
-                }
+                },
+                currentRoom: game.currentRoom
             };
             const saveStr = JSON.stringify(saveData);
             const pin = Math.floor(1000 + Math.random() * 9000).toString();
@@ -386,8 +387,7 @@
                 game.dungeon.currentLevel = saveData.dungeon.currentLevel;
                 game.dungeon.size = saveData.dungeon.size;
                 game.dungeon.hasSecretRoom = saveData.dungeon.hasSecretRoom;
-                const key = `${game.player.position.x},${game.player.position.y}`;
-                game.currentRoom = game.dungeon.grid[key];
+                game.currentRoom = saveData.currentRoom;
                 game.initialized = true;
                 game.started = true;
                 game.needsClass = false;
@@ -404,7 +404,7 @@
         function initializeGame() {
             game.initialized = true;
             micButton.classList.remove('start-button');
-            speak("Welcome to Echo Dungeon Enhanced! Say 'load game' and provide your save PIN, or choose your class: warrior, mage, or rogue."); 
+            speak("Welcome to Echo Dungeon Enhanced! Say 'load game' and provide your save PIN, or choose your class: warrior, mage, or rogue.");
         }
 
         function handleClick() {
@@ -416,52 +416,47 @@
         }
 
         function processCommand(command) {
-            if (command.includes('save game') || command.includes('save')) { 
-                saveGame(); 
-                return; 
+            if (command.includes('save game') || command.includes('save')) {
+                saveGame();
+                return;
             }
-            
             if (command.includes('load game') || command.includes('load')) {
                 speak('Please say your save PIN after the word "code".');
                 game.phase = 'loading';
                 return;
             }
-            
             if (command.includes('code ') && game.phase === 'loading') {
                 const pin = command.split('code ')[1].trim().replace(/\s/g, '');
                 loadGame(pin);
                 return;
             }
-
             if (game.needsClass) {
                 if (command.includes('warrior') || command.includes('fighter')) selectClass('warrior');
-                else if (command.includes('mage') || command.includes('wizard')) selectClass('mage'); 
+                else if (command.includes('mage') || command.includes('wizard')) selectClass('mage');
                 else if (command.includes('rogue') || command.includes('thief')) selectClass('rogue');
                 else speak('Please say warrior, mage, or rogue.');
                 return;
             }
-
             if (game.combat) {
                 if (command.includes('attack') || command.includes('fight')) playerAttack();
                 else if (command.includes('defend') || command.includes('block') || command.includes('guard')) playerDefend();
                 else if (command.includes('special') || command.includes('ability')) playerSpecial();
-                else if (command.includes('cast') || command.includes('spell')) castSpell(command);
-                else if (command.includes('potion') || command.includes('use') || command.includes('drink') || command.includes('heal')) processPotionCommand(command); 
+                else if (command.includes('use ability') || (game.player.class === 'mage' && command.includes('cast'))) castAbility(command);
+                else if (command.includes('potion') || command.includes('use') || command.includes('drink') || command.includes('heal')) processPotionCommand(command);
                 else if (command.includes('flee') || command.includes('run') || command.includes('escape')) attemptFlee();
-                else speak('Say attack, defend, special, cast spell, use potion, or flee.');
+                else speak('Say attack, defend, special, use ability, use potion, or flee.');
                 return;
             }
-
             if (command.includes('status') || command.includes('stats') || command.includes('check')) characterStatus();
             else if (command.includes('inventory') || command.includes('items') || command.includes('bag')) listInventory();
             else if (command.includes('commands') || command.includes('what can i')) listCommands();
             else if (command.includes('hint') || command.includes('help me')) giveHint();
-            else if (command.includes('potion') || command.includes('use') || command.includes('drink') || command.includes('heal')) processPotionCommand(command); 
+            else if (command.includes('potion') || command.includes('use') || command.includes('drink') || command.includes('heal')) processPotionCommand(command);
             else if (command.includes('north') || command.includes('forward')) move('north');
             else if (command.includes('south') || command.includes('back')) move('south');
             else if (command.includes('east') || command.includes('right')) move('east');
             else if (command.includes('west') || command.includes('left')) move('west');
-            else if (command.includes('meditate') || command.includes('rest')) meditate(); 
+            else if (command.includes('meditate') || command.includes('rest')) meditate();
             else if (command.includes('look') || command.includes('around') || command.includes('where')) describeRoom();
             else if (command.includes('search') || command.includes('examine')) searchRoom();
             else if (command.includes('open chest') || command.includes('chest') || command.includes('loot')) openChest();
@@ -482,7 +477,6 @@
                 actualExp = Math.floor(exp * amulets.find(a => a.name === game.player.equippedAmulet).value);
             }
             game.player.experience += actualExp;
-            
             if (game.player.experience >= game.player.experienceToNext) {
                 levelUp();
             }
@@ -492,15 +486,12 @@
             game.player.level++;
             game.player.experience -= game.player.experienceToNext;
             game.player.experienceToNext = Math.floor(game.player.experienceToNext * 1.5);
-            
             const healthGain = 20;
             const manaGain = 10;
-            
             game.player.maxHealth += healthGain;
             game.player.health = game.player.maxHealth;
             game.player.maxMana += manaGain;
             game.player.mana = game.player.maxMana;
-            
             speakSequence([
                 `Level up! You are now level ${game.player.level}!`,
                 `Max health increased by ${healthGain}!`,
@@ -510,44 +501,36 @@
         }
 
         function equipRing(command) {
-            const ringName = command.includes('health') ? 'Ring of Minor Health' :
+            const ringName = command.includes('health') || command.includes('minor health') || command.includes('health ring') ? 'Ring of Minor Health' :
                              command.includes('mana') || command.includes('minor mana') || command.includes('mana ring') ? 'Ring of Minor Mana' :
                              command.includes('protection') ? 'Ring of Protection' :
                              command.includes('strength') ? 'Ring of Strength' :
                              command.includes('wisdom') ? 'Ring of Wisdom' : null;
-
             if (!ringName) {
-                const availableRings = game.player.inventory.filter(item => 
-                    rings.some(r => r.name === item)
-                );
+                const availableRings = game.player.inventory.filter(item => rings.some(r => r.name === item));
                 if (availableRings.length > 0) {
-                    speak(`You have: ${availableRings.join(', ')}. Say which one to equip.`);
+                    speak(`You have: ${availableRings.join(', ')}. Say which one to equip, like 'wear health ring'.`);
                 } else {
                     speak('You have no rings. Find them in treasure chests or by searching rooms.');
                 }
                 return;
             }
-
             const ringIndex = game.player.inventory.findIndex(item => item === ringName);
             if (ringIndex === -1) {
                 speak(`You do not have a ${ringName}.`);
                 return;
             }
-
             if (game.player.equippedRings.includes(ringName)) {
                 speak(`You are already wearing the ${ringName}.`);
                 return;
             }
-
             const ringData = rings.find(r => r.name === ringName);
             if (!ringData) {
                 speak(`Error: Ring data not found.`);
                 return;
             }
-
             game.player.inventory.splice(ringIndex, 1);
             game.player.equippedRings.push(ringName);
-
             if (ringData.stat === 'maxHealth') {
                 game.player.maxHealth += ringData.value;
                 game.player.health += ringData.value;
@@ -565,39 +548,31 @@
             const amuletName = command.includes('vitality') ? 'Amulet of Vitality' :
                                command.includes('mana') ? 'Amulet of Mana' :
                                command.includes('experience') ? 'Amulet of Experience' : null;
-
             if (!amuletName) {
-                const availableAmulets = game.player.inventory.filter(item => 
-                    amulets.some(a => a.name === item)
-                );
+                const availableAmulets = game.player.inventory.filter(item => amulets.some(a => a.name === item));
                 if (availableAmulets.length > 0) {
-                    speak(`You have: ${availableAmulets.join(', ')}. Say which one to equip.`);
+                    speak(`You have: ${availableAmulets.join(', ')}. Say which one to equip, like 'equip amulet vitality'.`);
                 } else {
                     speak('You have no amulets. Find them in treasure chests or by searching rooms.');
                 }
                 return;
             }
-
             const amuletIndex = game.player.inventory.findIndex(item => item === amuletName);
             if (amuletIndex === -1) {
                 speak(`You do not have the ${amuletName}.`);
                 return;
             }
-
             if (game.player.equippedAmulet === amuletName) {
                 speak(`You are already wearing the ${amuletName}.`);
                 return;
             }
-
             const amuletData = amulets.find(a => a.name === amuletName);
             if (!amuletData) {
                 speak(`Error: Amulet data not found.`);
                 return;
             }
-
             game.player.inventory.splice(amuletIndex, 1);
             game.player.equippedAmulet = amuletName;
-
             if (amuletData.stat === 'maxHealth') {
                 game.player.maxHealth += amuletData.value;
                 game.player.health += amuletData.value;
@@ -610,23 +585,148 @@
                 speak(`You equip the ${amuletName}. You now gain 20% more experience!`);
             }
         }
+        function equipItem(command) {
+            const itemName = equipment.weapons.concat(equipment.armor).find(item => command.includes(item.name.toLowerCase()))?.name;
+            if (!itemName) {
+                const items = game.player.inventory.filter(item => equipment.weapons.some(w => w.name === item) || equipment.armor.some(a => a.name === item));
+                if (items.length > 0) {
+                    speak(`You have: ${items.join(', ')}. Say "equip <item name>".`);
+                } else {
+                    speak('You have no equipment to equip.');
+                }
+                return;
+            }
+            const itemIndex = game.player.inventory.findIndex(item => item === itemName);
+            if (itemIndex === -1) {
+                speak(`You do not have a ${itemName}.`);
+                return;
+            }
+            const weapon = equipment.weapons.find(w => w.name === itemName);
+            const armor = equipment.armor.find(a => a.name === itemName);
+            if (weapon && weapon.class !== game.player.class) {
+                speak(`Only a ${weapon.class} can equip ${itemName}.`);
+                return;
+            }
+            if (armor && armor.class !== game.player.class) {
+                speak(`Only a ${armor.class} can equip ${itemName}.`);
+                return;
+            }
+            game.player.inventory.splice(itemIndex, 1);
+            if (weapon) {
+                game.player.weapon = itemName;
+                game.player.baseAttack = weapon.attack;
+                speak(`You equip the ${itemName}. Your attacks are now stronger!`);
+            } else if (armor) {
+                game.player.armor = itemName;
+                game.player.defense = armor.defense;
+                speak(`You equip the ${itemName}. Your defense is improved!`);
+            }
+        }
+
+        function readBook(command) {
+            const bookName = abilities.find(a => command.includes(a.name.toLowerCase()))?.name;
+            if (!bookName) {
+                const books = game.player.inventory.filter(item => abilities.some(a => a.name === item));
+                if (books.length > 0) {
+                    speak(`You have these books: ${books.join(', ')}. Say "read <book name>" to learn one.`);
+                } else {
+                    speak('You have no ability books. Find them in chests or secret rooms.');
+                }
+                return;
+            }
+            const bookIndex = game.player.inventory.findIndex(item => item === bookName);
+            if (bookIndex === -1) {
+                speak(`You do not have the ${bookName} book.`);
+                return;
+            }
+            if (game.player.learnedAbilities.some(a => a.name === bookName)) {
+                speak(`You already know ${bookName}.`);
+                return;
+            }
+            const ability = abilities.find(a => a.name === bookName);
+            if (ability.class !== game.player.class) {
+                speak(`Only a ${ability.class} can learn ${bookName}.`);
+                return;
+            }
+            game.player.inventory.splice(bookIndex, 1);
+            game.player.learnedAbilities.push(ability);
+            speak(`You learn ${bookName}! ${ability.description}. Say "use ability ${bookName}" in combat.`);
+        }
+
+        function castAbility(command) {
+            if (!game.combat) {
+                speak('You can only use abilities in combat.');
+                return;
+            }
+            const abilityName = game.player.learnedAbilities.find(a => command.includes(a.name.toLowerCase()))?.name;
+            if (!abilityName) {
+                if (game.player.learnedAbilities.length > 0) {
+                    speak(`You know: ${game.player.learnedAbilities.map(a => a.name).join(', ')}. Say "use ability <ability name>".`);
+                } else {
+                    speak('You have not learned any abilities.');
+                }
+                return;
+            }
+            const ability = game.player.learnedAbilities.find(a => a.name === abilityName);
+            if (game.player.mana < ability.cost) {
+                speak(`Not enough mana. You need ${ability.cost}.`);
+                return;
+            }
+            game.player.mana -= ability.cost;
+            let actionVerb = game.player.class === 'mage' ? 'cast' : 'execute';
+            if (ability.type === 'heal') {
+                const oldHealth = game.player.health;
+                game.player.health = Math.min(game.player.maxHealth, game.player.health + ability.healing);
+                const actualHeal = game.player.health - oldHealth;
+                speak(`You ${actionVerb} ${ability.name} and restore ${actualHeal} health!`, () => {
+                    setTimeout(() => enemyTurn(), 1000);
+                });
+            } else if (ability.type === 'stun') {
+                game.combat.enemy.stunned = true;
+                speak(`You ${actionVerb} ${ability.name}, stunning the ${game.combat.enemy.name}!`, () => {
+                    setTimeout(() => enemyTurn(), 1000);
+                });
+            } else if (ability.type === 'poison') {
+                game.combat.enemy.poisoned = { damage: 5, duration: ability.duration };
+                speak(`You ${actionVerb} ${ability.name}, poisoning the ${game.combat.enemy.name}!`, () => {
+                    setTimeout(() => enemyTurn(), 1000);
+                });
+            }
+        }
+
+        function useLockpicks() {
+            if (game.player.class !== 'rogue') {
+                speak('Only a rogue can use lockpicks.');
+                return;
+            }
+            if (game.player.inventory.indexOf('Lockpicks') === -1) {
+                speak('You have no lockpicks.');
+                return;
+            }
+            if (game.currentRoom.type === 'trap' && !game.currentRoom.visited) {
+                game.currentRoom.visited = true;
+                speak('You use your lockpicks to disarm the trap safely!');
+            } else if (game.currentRoom.hasChest && !game.currentRoom.searched) {
+                game.player.inventory.splice(game.player.inventory.indexOf('Lockpicks'), 1);
+                game.player.gold += 50;
+                speak('You use your lockpicks to unlock a hidden compartment in the chest, finding 50 extra gold!');
+            } else {
+                speak('No traps or chests to use lockpicks on.');
+            }
+        }
 
         function useStairs() {
             if (game.currentRoom.type !== 'stairs') {
                 speak('There are no stairs here.');
                 return;
             }
-            
-            const bossKey = `${game.dungeon.size - 1},${game.dungeon.size - 1}`;
-            const bossRoom = game.dungeon.grid[bossKey];
+            const bossRoom = game.dungeon.grid[`${game.dungeon.size - 1},${game.dungeon.size - 1}`];
             if (bossRoom.enemy && bossRoom.enemy.health > 0) {
-                speak('You must defeat the dragon in the boss room first.');
+                speak('You must defeat the dragon in the boss room before descending.');
                 return;
             }
-            
             game.dungeon.currentLevel++;
-            generateDungeon(); 
-
+            generateDungeon();
             speak(`You descend to Dungeon Level ${game.dungeon.currentLevel}. The air grows colder and more dangerous.`, () => {
                 describeRoom();
             });
@@ -637,22 +737,22 @@
                 speak('There is no fountain here.');
                 return;
             }
-            
             if (game.currentRoom.fountainUsed) {
                 speak('The fountain has run dry. Its magic is spent.');
                 return;
             }
-            
             game.currentRoom.fountainUsed = true;
             game.player.health = game.player.maxHealth;
             game.player.mana = game.player.maxMana;
-            
             speak('You drink from the magical fountain. You are fully healed and restored!');
         }
 
         function selectClass(className) {
             const classData = classes[className];
             game.player.class = className;
+            game.player.level = 1; // Ensure level starts at 1
+            game.player.experience = 0;
+            game.player.experienceToNext = 100;
             game.player.health = classData.health;
             game.player.maxHealth = classData.maxHealth;
             game.player.mana = classData.mana;
@@ -669,15 +769,13 @@
             game.needsClass = false;
             game.started = true;
             game.phase = 'exploration';
-            
             generateDungeon();
-            
             speakSequence([
                 `You are now a ${classData.name}.`,
                 `Health: ${classData.health}.`,
                 `Mana: ${classData.mana}.`,
                 `Starting gold: ${classData.gold}.`,
-                `Equipped: ${game.player.weapon} and ${game.player.armor}.`,
+                `Equipped: ${game.player.weapon || 'fists'} and ${game.player.armor || 'none'}.`,
                 `Your adventure begins!`
             ], () => {
                 setTimeout(() => describeRoom(), 1000);
@@ -692,26 +790,22 @@
         function generateDungeon() {
             const size = game.dungeon.size;
             game.dungeon.grid = {};
-            
-            const centerX = 5; 
+            const centerX = 5;
             const centerY = 5;
-            
             for (let x = 0; x < size; x++) {
                 for (let y = 0; y < size; y++) {
                     const key = `${x},${y}`;
                     const distanceX = Math.abs(x - centerX);
                     const distanceY = Math.abs(y - centerY);
                     const distanceFromCenter = distanceX + distanceY;
-                    
                     let roomData = { visited: false, searched: false, hasChest: false, fountainUsed: false };
-
                     if (x === centerX && y === centerY) {
-                        game.dungeon.grid[key] = { 
-                            type: 'entrance', 
+                        game.dungeon.grid[key] = {
+                            type: 'entrance',
                             description: getRandomDescription('entrance'),
                             ...roomData
                         };
-                    } else if (x === size - 1 && y === size - 1) { 
+                    } else if (x === size - 1 && y === size - 1) {
                         game.dungeon.grid[key] = {
                             type: 'boss',
                             description: getRandomDescription('boss'),
@@ -719,18 +813,16 @@
                             hasChest: true,
                             enemy: { ...enemies.dragon }
                         };
-                    } else if (x === size - 1 && y === size - 2) { 
-                        game.dungeon.grid[key] = { 
-                            type: 'stairs', 
+                    } else if (x === size - 1 && y === size - 2) {
+                        game.dungeon.grid[key] = {
+                            type: 'stairs',
                             description: getRandomDescription('stairs'),
-                            ...roomData 
+                            ...roomData
                         };
                     } else {
                         let roomType = null;
                         let enemyType = null;
-                        
                         const roll = Math.random();
-                        
                         if (distanceFromCenter >= 7) {
                             if (roll < 0.5) {
                                 roomType = 'enemy';
@@ -773,7 +865,6 @@
                                 roomData.hasChest = Math.random() < 0.15;
                             }
                         }
-                        
                         if (roomType === 'enemy') {
                             game.dungeon.grid[key] = {
                                 type: 'enemy',
@@ -791,36 +882,32 @@
                     }
                 }
             }
-            
             if (Math.random() < 0.3) {
                 game.dungeon.hasSecretRoom = true;
             }
-            
-            game.player.position = { x: 5, y: 5 };
-            const key = `${game.player.position.x},${game.player.position.y}`;
-            game.currentRoom = game.dungeon.grid[key];
+            game.player.position = { x: centerX, y: centerY };
+            game.currentRoom = game.dungeon.grid[`${centerX},${centerY}`];
         }
 
         function move(direction) {
             const { x, y } = game.player.position;
             let newX = x, newY = y;
-            
             if (direction === 'north') newY--;
             else if (direction === 'south') newY++;
             else if (direction === 'east') newX++;
             else if (direction === 'west') newX--;
-            
             if (newX < 0 || newX >= game.dungeon.size || newY < 0 || newY >= game.dungeon.size) {
                 speak('You cannot go that way. A solid wall blocks your path.');
                 return;
             }
-            
             game.player.position = { x: newX, y: newY };
             const key = `${newX},${newY}`;
             game.currentRoom = game.dungeon.grid[key];
-            
-            if (game.currentRoom.type === 'trap') {
-                if (!game.currentRoom.visited) {
+            if (game.currentRoom.type === 'trap' && !game.currentRoom.visited) {
+                if (game.player.class === 'rogue' && Math.random() < 0.5) {
+                    speak('Your rogue instincts avoid a trap!');
+                    game.currentRoom.visited = true;
+                } else {
                     const trapDamage = 15;
                     game.player.health -= trapDamage;
                     speak(`A trap springs! You take ${trapDamage} damage! Health: ${game.player.health}.`);
@@ -830,34 +917,33 @@
                     }
                 }
             }
-
             game.currentRoom.visited = true;
             describeRoom();
         }
 
         function describeRoom() {
             const room = game.currentRoom;
-            const messages = [`You are on Level ${game.dungeon.currentLevel} in ${room.description}`];
-            
+            const className = classes[game.player.class].name;
+            const messages = [`Level ${game.dungeon.currentLevel}: You stand in ${room.description}`];
             if (room.type === 'stairs') {
-                messages.push('Dark stairs descend deeper. Say "go down stairs" to descend.');
+                messages.push(`${className} senses dark stairs descending deeper. Say "go down stairs" to proceed.`);
             } else if (room.type === 'fountain' && !room.fountainUsed) {
-                messages.push('A magical fountain bubbles here. Say "drink fountain" to be healed.');
+                messages.push(`A magical fountain hums with power. Say "drink fountain" to heal.`);
             } else if (room.enemy && room.enemy.health > 0) {
-                messages.push(`A ${room.enemy.name} blocks your path!`);
+                messages.push(`A ${room.enemy.name} snarls, ready to strike!`);
                 speakSequence(messages, () => {
                     setTimeout(() => startCombat(room.enemy), 1000);
                 });
                 return;
             } else {
                 if (room.hasChest && !room.searched) {
-                    messages.push('A treasure chest glimmers in the shadows. Say "open chest" to loot it.');
+                    messages.push(`Your ${className} instincts spot a treasure chest. Say "open chest" to loot it.`);
                 }
                 if (!room.searched && room.type !== 'stairs') {
-                    messages.push('You could search this room.');
+                    messages.push(`Your ${className} senses something hidden. Say "search" to investigate.`);
                 }
             }
-            messages.push('Which direction will you go?');
+            messages.push('Which direction will you go? North, south, east, or west.');
             speakSequence(messages);
         }
 
@@ -885,16 +971,13 @@
 
         function searchRoom() {
             const room = game.currentRoom;
-            
             if (room.searched) {
                 speak('You already searched this room thoroughly.');
                 return;
             }
-            
             room.searched = true;
-            
-            if (game.dungeon.hasSecretRoom && !game.dungeon.secretRoom && Math.random() < 0.15) {
-                game.dungeon.secretRoom = true;
+            if (game.dungeon.hasSecretRoom && Math.random() < 0.15) {
+                game.dungeon.hasSecretRoom = false;
                 speakSequence([
                     'You found a hidden passage behind a loose stone!',
                     'Inside, ancient treasures await!'
@@ -923,26 +1006,21 @@
 
         function openChest() {
             const room = game.currentRoom;
-            
             if (!room.hasChest) {
                 speak('There is no chest here.');
                 return;
             }
-            
             if (room.searched) {
                 speak('The chest is empty. You already looted it.');
                 return;
             }
-            
             room.searched = true;
-            
             if (Math.random() < 0.08) {
                 speak('The chest springs to life! It is a mimic!');
                 const mimic = { name: 'Mimic', health: 45, damage: 12, gold: 15, exp: 25, fleeChance: 0.5 };
                 startCombat(mimic);
             } else {
                 let messages = ['You open the ornate chest and discover:'];
-                
                 if (room.type === 'treasure') {
                     const treasure1 = determineTreasure();
                     const treasure2 = determineTreasure();
@@ -950,7 +1028,6 @@
                     game.player.gold += treasure2.value;
                     messages.push(`${treasure1.name} worth ${treasure1.value} gold!`);
                     messages.push(`${treasure2.name} worth ${treasure2.value} gold!`);
-                    
                     if (Math.random() < 0.4) {
                         const potion = Math.random() < 0.5 ? 'Health Potion' : 'Mana Potion';
                         game.player.inventory.push(potion);
@@ -959,7 +1036,6 @@
                 } else {
                     const loot1 = determineLoot();
                     const loot2 = determineLoot();
-                    
                     if (loot1.type === 'gold') {
                         game.player.gold += loot1.amount;
                         messages.push(`${loot1.amount} gold.`);
@@ -973,7 +1049,6 @@
                         game.player.inventory.push(loot1.item);
                         messages.push(`A ${loot1.item}.`);
                     }
-
                     if (loot2.type === 'gold') {
                         game.player.gold += loot2.amount;
                         messages.push(`${loot2.amount} gold.`);
@@ -988,7 +1063,6 @@
                         messages.push(`A ${loot2.item}.`);
                     }
                 }
-                
                 if (Math.random() < 0.2) {
                     const ability = abilities.find(a => a.class === game.player.class);
                     if (ability) {
@@ -996,9 +1070,20 @@
                         messages.push(`A ${ability.name} book! Say "read ${ability.name}" to learn it.`);
                     }
                 }
-                
-                if (messages.length === 1) { messages.push('Nothing of value.'); }
-
+                if (Math.random() < 0.15) {
+                    const availableEquipment = [
+                        ...equipment.weapons.filter(w => w.class === game.player.class),
+                        ...equipment.armor.filter(a => a.class === game.player.class)
+                    ];
+                    if (availableEquipment.length > 0) {
+                        const item = availableEquipment[Math.floor(Math.random() * availableEquipment.length)];
+                        game.player.inventory.push(item.name);
+                        messages.push(`A ${item.name}! Say "equip ${item.name}" to use it.`);
+                    }
+                }
+                if (messages.length === 1) {
+                    messages.push('Nothing of value.');
+                }
                 speakSequence(messages);
             }
         }
@@ -1010,15 +1095,12 @@
             }
             const manaRestored = 15;
             const previousMana = game.player.mana;
-            
             if (game.player.mana === game.player.maxMana) {
                 speak('You are already at full mana.');
                 return;
             }
-
             game.player.mana = Math.min(game.player.maxMana, game.player.mana + manaRestored);
             const actualRestored = game.player.mana - previousMana;
-
             speak(`You meditate and restore ${actualRestored} mana. Current mana: ${game.player.mana}.`);
         }
 
@@ -1028,23 +1110,20 @@
             speakSequence([
                 `Combat begins!`,
                 `${enemy.name} has ${enemy.health} health.`,
-                `What will you do? Attack, defend, special, cast spell, use potion, or flee.`
+                `What will you do? Attack, defend, special, use ability, use potion, or flee.`
             ]);
         }
-        
+
         function processPotionCommand(command) {
             let potionType = null;
-            
             if (command.includes('health') || command.includes('heal')) {
                 potionType = 'Health Potion';
             } else if (command.includes('mana')) {
                 potionType = 'Mana Potion';
             }
-            
             if (!potionType) {
                 const healthIdx = game.player.inventory.indexOf('Health Potion');
                 const manaIdx = game.player.inventory.indexOf('Mana Potion');
-                
                 if (healthIdx !== -1 && game.player.health < game.player.maxHealth) {
                     potionType = 'Health Potion';
                 } else if (manaIdx !== -1 && game.player.mana < game.player.maxMana) {
@@ -1055,7 +1134,6 @@
                     potionType = 'Mana Potion';
                 }
             }
-            
             if (potionType) {
                 usePotion(potionType);
             } else {
@@ -1064,13 +1142,14 @@
         }
 
         function playerAttack() {
-            const baseDamage = 15;
+            const weaponBonus = equipment.weapons.find(w => w.name === game.player.weapon)?.attack || 0;
             const ringBonus = game.player.equippedRings.includes('Ring of Strength') ? 2 : 0;
-            const damage = baseDamage + ringBonus + Math.floor(Math.random() * 15);
+            const levelBonus = Math.floor(game.player.level * 2);
+            const damage = game.player.baseAttack + weaponBonus + ringBonus + levelBonus + Math.floor(Math.random() * 15);
             game.combat.enemy.health -= damage;
-            
+            const weapon = game.player.weapon || 'fists';
             speakSequence([
-                `You attack for ${damage} damage!`,
+                `You swing your ${weapon} for ${damage} damage!`,
                 `${game.combat.enemy.name} has ${Math.max(0, game.combat.enemy.health)} health left.`
             ], () => {
                 if (game.combat.enemy.health <= 0) {
@@ -1091,18 +1170,14 @@
         function playerSpecial() {
             const classData = classes[game.player.class];
             const special = classData.special;
-            
             if (game.player.mana < special.cost) {
                 speak(`Not enough mana. You need ${special.cost}.`);
                 return;
             }
-            
             game.player.mana -= special.cost;
-            
             if (special.type === 'damage') {
-                let damage = special.damage + (game.player.level * 5); // Scale with level
+                const damage = special.damage + (game.player.level * 5); // Scale with level
                 game.combat.enemy.health -= damage;
-                
                 speakSequence([
                     `You unleash ${special.name}!`,
                     `${damage} damage!`,
@@ -1123,15 +1198,13 @@
                 speak(`You do not have a ${potionType}.`);
                 return;
             }
-            
             game.player.inventory.splice(idx, 1);
-            
             if (potionType === 'Health Potion') {
                 const heal = 40;
                 const oldHealth = game.player.health;
                 game.player.health = Math.min(game.player.maxHealth, game.player.health + heal);
                 const actualHeal = game.player.health - oldHealth;
-                speak(`You drink a health potion and restore ${actualHeal} health. Health: ${game.player.health}.`, () => {
+                speak(`You drink a Health Potion and restore ${actualHeal} health. Health: ${game.player.health}.`, () => {
                     if (game.combat) {
                         setTimeout(() => enemyTurn(), 1000);
                     }
@@ -1141,7 +1214,7 @@
                 const oldMana = game.player.mana;
                 game.player.mana = Math.min(game.player.maxMana, game.player.mana + restore);
                 const actualRestore = game.player.mana - oldMana;
-                speak(`You drink a mana potion and restore ${actualRestore} mana. Mana: ${game.player.mana}.`, () => {
+                speak(`You drink a Mana Potion and restore ${actualRestore} mana. Mana: ${game.player.mana}.`, () => {
                     if (game.combat) {
                         setTimeout(() => enemyTurn(), 1000);
                     }
@@ -1152,7 +1225,6 @@
         function attemptFlee() {
             const chance = game.combat.enemy.fleeChance;
             const roll = Math.random();
-            
             speak(`Attempting to flee...`, () => {
                 setTimeout(() => {
                     if (roll < chance) {
@@ -1196,15 +1268,13 @@
                     return;
                 }
             }
-            let damage = game.combat.enemy.damage;
-            
+            let damage = game.combat.enemy.damage - game.player.defense;
             if (game.combat.playerDefending) {
                 damage = Math.floor(damage * 0.5);
                 game.combat.playerDefending = false;
             }
-            
+            damage = Math.max(1, damage);
             game.player.health -= damage;
-            
             speakSequence([
                 `${game.combat.enemy.name} attacks for ${damage} damage!`,
                 `Your health: ${Math.max(0, game.player.health)}.`
@@ -1212,9 +1282,7 @@
                 if (game.player.health <= 0) {
                     setTimeout(() => gameOver(), 1000);
                 } else {
-                    setTimeout(() => {
-                        speak('What will you do?');
-                    }, 500);
+                    setTimeout(() => speak('What will you do?'), 500);
                 }
             });
         }
@@ -1223,11 +1291,9 @@
             const gold = game.combat.enemy.gold;
             const exp = game.combat.enemy.exp;
             game.player.gold += gold;
-            
             if (game.currentRoom.enemy) {
                 game.currentRoom.enemy.health = 0;
             }
-            
             speakSequence([
                 `${game.combat.enemy.name} defeated!`,
                 `You gain ${gold} gold and ${exp} experience!`
@@ -1235,7 +1301,6 @@
                 game.combat = null;
                 game.phase = 'exploration';
                 gainExperience(exp);
-                
                 if (game.currentRoom.type === 'boss') {
                     setTimeout(() => dungeonComplete(), 1500);
                 } else {
@@ -1245,12 +1310,21 @@
         }
 
         function dungeonComplete() {
-            speakSequence([
-                'You defeated the dragon!',
-                'The dungeon level is cleared!',
-                'Seek the stairs to descend deeper!',
-                `You are now level ${game.player.level} with ${game.player.gold} gold.`
-            ]);
+            if (game.dungeon.currentLevel === 5) {
+                speakSequence([
+                    'You defeated the Dragon King!',
+                    'The dungeon is conquered!',
+                    `As a level ${game.player.level} ${classes[game.player.class].name}, you are a legend!`,
+                    'Game complete! Refresh to start a new adventure.'
+                ]);
+            } else {
+                speakSequence([
+                    'You defeated the dragon!',
+                    'The dungeon level is cleared!',
+                    'Seek the stairs to descend deeper!',
+                    `You are now level ${game.player.level} with ${game.player.gold} gold.`
+                ]);
+            }
         }
 
         function gameOver() {
@@ -1265,9 +1339,8 @@
         function characterStatus() {
             const classData = classes[game.player.class];
             const special = classData.special;
-            const specialInfo = special.type === 'damage' ? `Deals ${special.damage} damage.` : `Restores ${special.heal} health.`;
+            const specialInfo = special.type === 'damage' ? `Deals ${special.damage + (game.player.level * 5)} damage.` : `Restores ${special.heal} health.`;
             const expNeeded = game.player.experienceToNext - game.player.experience;
-
             let messages = [
                 `Level ${game.player.level} ${classData.name}.`,
                 `Health: ${game.player.health} of ${game.player.maxHealth}.`,
@@ -1275,57 +1348,62 @@
                 `Experience: ${game.player.experience}. Need ${expNeeded} for next level.`,
                 `Special ability: ${special.name}. Costs ${special.cost} mana. ${specialInfo}`,
                 `Gold: ${game.player.gold}.`,
+                `Equipped: ${game.player.weapon || 'fists'} and ${game.player.armor || 'none'}.`
             ];
-
             if (game.player.equippedRings.length > 0) {
                 messages.push(`Equipped rings: ${game.player.equippedRings.join(', ')}.`);
             } else {
                 messages.push(`No rings equipped.`);
             }
-
             if (game.player.equippedAmulet) {
                 messages.push(`Equipped amulet: ${game.player.equippedAmulet}.`);
             } else {
                 messages.push(`No amulet equipped.`);
             }
-
+            if (game.player.learnedAbilities.length > 0) {
+                messages.push(`Learned abilities: ${game.player.learnedAbilities.map(a => a.name).join(', ')}.`);
+            }
             speakSequence(messages);
         }
 
         function listInventory() {
-            if (game.player.inventory.length === 0 && game.player.equippedRings.length === 0) {
+            if (game.player.inventory.length === 0 && game.player.equippedRings.length === 0 && !game.player.equippedAmulet) {
                 speak(`Empty inventory. Gold: ${game.player.gold}.`);
             } else {
                 const healthPotions = game.player.inventory.filter(i => i === 'Health Potion').length;
                 const manaPotions = game.player.inventory.filter(i => i === 'Mana Potion').length;
                 const ringsList = game.player.inventory.filter(i => rings.some(r => r.name === i));
                 const amuletsList = game.player.inventory.filter(i => amulets.some(a => a.name === i));
-                const otherItems = game.player.inventory.filter(i => 
-                    i !== 'Health Potion' && 
-                    i !== 'Mana Potion' && 
-                    !ringsList.includes(i) && 
-                    !amuletsList.includes(i)
+                const booksList = game.player.inventory.filter(i => abilities.some(a => a.name === i));
+                const equipmentList = game.player.inventory.filter(i => equipment.weapons.some(w => w.name === i) || equipment.armor.some(a => a.name === i));
+                const otherItems = game.player.inventory.filter(i =>
+                    i !== 'Health Potion' &&
+                    i !== 'Mana Potion' &&
+                    !ringsList.includes(i) &&
+                    !amuletsList.includes(i) &&
+                    !booksList.includes(i) &&
+                    !equipmentList.includes(i)
                 );
-                
                 const messages = ['Inventory:'];
                 if (healthPotions > 0) messages.push(`${healthPotions} health potion${healthPotions > 1 ? 's' : ''}.`);
                 if (manaPotions > 0) messages.push(`${manaPotions} mana potion${manaPotions > 1 ? 's' : ''}.`);
                 if (ringsList.length > 0) messages.push(`Unequipped rings: ${ringsList.join(', ')}.`);
-                if (game.player.equippedRings.length > 0) messages.push(`Equipped rings: ${game.player.equippedRings.join(', ')}.`);
                 if (amuletsList.length > 0) messages.push(`Unequipped amulets: ${amuletsList.join(', ')}.`);
+                if (booksList.length > 0) messages.push(`Books: ${booksList.join(', ')}.`);
+                if (equipmentList.length > 0) messages.push(`Equipment: ${equipmentList.join(', ')}.`);
+                if (game.player.equippedRings.length > 0) messages.push(`Equipped rings: ${game.player.equippedRings.join(', ')}.`);
                 if (game.player.equippedAmulet) messages.push(`Equipped amulet: ${game.player.equippedAmulet}.`);
-                if (otherItems.length > 0) messages.push(`Equipment: ${otherItems.join(', ')}.`);
+                if (otherItems.length > 0) messages.push(`Other items: ${otherItems.join(', ')}.`);
                 messages.push(`Gold: ${game.player.gold}.`);
-                
                 speakSequence(messages);
             }
         }
 
         function showHelp() {
             if (game.phase === 'combat') {
-                speak('Combat commands: attack, defend, special, cast spell, use potion, or flee.');
+                speak('Combat commands: attack, defend, special, use ability, use potion, or flee.');
             } else {
-                speak('Exploration commands: north, south, east, west, look around, search, open chest, drink fountain, meditate, wear ring, equip amulet, use potion, status, inventory, save game, or load game.');
+                speak('Exploration commands: north, south, east, west, look around, search, open chest, drink fountain, meditate, wear ring, equip amulet, equip item, read book, use lockpicks, use potion, status, inventory, save game, or load game.');
             }
         }
 
@@ -1336,14 +1414,14 @@
                     'Attack. Deal damage.',
                     'Defend. Reduce incoming damage.',
                     'Special. Use your class ability.',
-                    'Cast spell. Use a learned ability.',
+                    'Use ability. Use a learned ability.',
                     'Use potion. Heal or restore mana.',
                     'Flee. Try to escape.'
                 ]);
             } else {
                 speakSequence([
                     'Movement: north, south, east, west, go down stairs.',
-                    'Actions: look around, search, open chest, drink fountain, meditate, wear ring, equip amulet, use potion.',
+                    'Actions: look around, search, open chest, drink fountain, meditate, wear ring, equip amulet, equip item, read book, use lockpicks, use potion.',
                     'Info: status, inventory, hint.',
                     'System: save game, load game, commands, help.'
                 ]);
@@ -1356,6 +1434,8 @@
                     speak('Your health is low. Consider using a health potion or defending.');
                 } else if (game.player.mana >= classes[game.player.class].special.cost) {
                     speak(`You have enough mana for ${classes[game.player.class].special.name}.`);
+                } else if (game.player.learnedAbilities.length > 0) {
+                    speak(`You can use: ${game.player.learnedAbilities.map(a => a.name).join(', ')}.`);
                 } else {
                     speak('Try attacking or defending based on your health.');
                 }
@@ -1370,7 +1450,7 @@
                 } else if (!room.searched) {
                     speak('You have not searched this room yet. Try searching.');
                 } else if (game.player.mana < game.player.maxMana * 0.5) {
-                    speak('Your mana is low. Consider saying meditate to recover.');
+                    speak('Your mana is low. Consider saying meditate or use a mana potion.');
                 } else if (room.type === 'boss') {
                     speak('This is a boss room. Be prepared for a tough fight.');
                 } else {
