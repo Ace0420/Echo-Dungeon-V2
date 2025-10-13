@@ -150,14 +150,14 @@ Find and equip rings for permanent bonuses:
 
 To save your game:
 1. Say "save game"
-2. A save code will be displayed on screen
+2. A save code will be ready to you
 3. Copy the code
 
 To load:
 1. Say "load game"
 2. Say "code" followed by your save code (no spaces)
 
-**Example**: "code abc123def456"
+**Example**: "code 1234"
 
 ## 🗺️ Map Layout
 
