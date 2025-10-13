@@ -147,8 +147,9 @@
                 { name: 'Shadow Leather', defense: 6, class: 'rogue', value: 110 }
             ]
         };
+        // FIX: Replaced 'Heal' with 'Ice Blast'
         const abilities = [
-            { name: 'Heal', damage: 0, healing: 40, cost: 25, type: 'heal', description: 'Restore 40 health using mana', class: 'mage' },
+            { name: 'Ice Blast', damage: 40, cost: 25, type: 'damage', description: 'Launch a blast of ice for 35 damage', class: 'mage' }, 
             { name: 'Shield Bash', damage: 30, cost: 20, type: 'stun', description: 'Stun enemy for one turn', class: 'warrior' },
             { name: 'Poison Blade', damage: 20, cost: 20, type: 'poison', duration: 3, description: 'Poison damages 5 per turn for 3 turns', class: 'rogue' }
         ];
@@ -442,29 +443,29 @@
                 return;
             }
             
-            // --- HIGH PRIORITY EXPLORATION ACTIONS (Force return to prevent fall-through) ---
+            // --- HIGH PRIORITY EXPLORATION ACTIONS ---
 
-            // 1. READ BOOK (Must precede generic 'heal' and 'use' logic)
+            // 1. READ BOOK
             if (command.includes('read book') || command.includes('read') || command.includes('learn')) {
                 readBook(command);
                 return;
             }
 
-            // 2. EQUIP RING (Must precede generic 'equip/wear' and 'heal' logic)
+            // 2. EQUIP RING 
             if ((command.includes('wear ring') || command.includes('equip ring') || command.includes('put on ring')) || 
-                (command.includes('ring') && (command.includes('wear') || command.includes('equip') || command.includes('health') || command.includes('mana')))) {
+                (command.includes('ring') && (command.includes('wear') || command.includes('equip') || command.includes('health') || command.includes('mana') || command.includes('strength')))) {
                 equipRing(command);
                 return;
             }
 
-            // 3. EQUIP AMULET (Must precede generic 'equip/wear')
+            // 3. EQUIP AMULET
             if ((command.includes('equip amulet') || command.includes('wear amulet')) || 
                 (command.includes('amulet') && (command.includes('wear') || command.includes('equip')))) {
                 equipAmulet(command);
                 return;
             }
 
-            // 4. POTION/HEAL/USE (Generic consumable action)
+            // 4. POTION/HEAL/USE
             if (command.includes('potion') || command.includes('use') || command.includes('drink') || command.includes('heal')) {
                 processPotionCommand(command);
                 return;
@@ -482,7 +483,7 @@
                 return;
             }
             
-            // --- STANDARD EXPLORATION ACTIONS (Else-if chain is fine) ---
+            // --- STANDARD EXPLORATION ACTIONS ---
             if (command.includes('status') || command.includes('stats') || command.includes('check')) characterStatus();
             else if (command.includes('inventory') || command.includes('items') || command.includes('bag')) listInventory();
             else if (command.includes('commands') || command.includes('what can i')) listCommands();
@@ -503,11 +504,9 @@
 
         function gainExperience(exp) {
             let actualExp = exp;
-            // FIX: Ensure amulets constant is accessible and check for the correct amulet name
             const expAmulet = amulets.find(a => a.name === 'Amulet of Experience');
             if (game.player.equippedAmulet === expAmulet.name) {
                 actualExp = Math.floor(exp * expAmulet.value);
-                // Report bonus if combat just ended
                 if (!game.combat) {
                     speak(`Your Amulet of Experience grants you a bonus: total experience gained is ${actualExp}.`);
                 }
@@ -518,20 +517,43 @@
             }
         }
 
+        // FIX: Updated to include attack and ability damage scaling
         function levelUp() {
             game.player.level++;
             game.player.experience -= game.player.experienceToNext;
             game.player.experienceToNext = Math.floor(game.player.experienceToNext * 1.5);
             const healthGain = 20;
             const manaGain = 10;
+            const attackGain = 3;
+            const specialGain = 5;
+
+            // 1. STAT INCREASES
             game.player.maxHealth += healthGain;
             game.player.health = game.player.maxHealth;
             game.player.maxMana += manaGain;
             game.player.mana = game.player.maxMana;
+            
+            // 2. BASE ATTACK INCREASE
+            game.player.baseAttack += attackGain; 
+            
+            // 3. SPECIAL ABILITY INCREASE (Affects Fireball, Power Strike, Backstab)
+            const classData = classes[game.player.class];
+            classData.special.damage += specialGain;
+            
+            // 4. LEARNED ABILITY INCREASE (Affects Ice Blast, Shield Bash, Poison Blade)
+            // Iterate over ALL learned abilities (since new ones might be added)
+            game.player.learnedAbilities.forEach(ability => {
+                // Only increase damage-related abilities
+                if (ability.type === 'damage' || ability.type === 'stun' || ability.type === 'poison') {
+                    ability.damage = (ability.damage || 0) + specialGain;
+                }
+            });
+
+
             speakSequence([
                 `Level up! You are now level ${game.player.level}!`,
-                `Max health increased by ${healthGain}!`,
-                `Max mana increased by ${manaGain}!`,
+                `Max health increased by ${healthGain} and Max Mana by ${manaGain}!`,
+                `Your attack damage increased by ${attackGain} and Special Ability damage by ${specialGain}!`,
                 `Fully healed and restored!`
             ]);
         }
@@ -561,6 +583,24 @@
                 speak(`You are already wearing the ${ringName}.`);
                 return;
             }
+
+            // Unequip another ring if player already has two equipped
+            if (game.player.equippedRings.length >= 2) {
+                const oldRingName = game.player.equippedRings.shift(); // Remove the oldest equipped ring
+                const oldRingData = rings.find(r => r.name === oldRingName);
+                if (oldRingData) {
+                    if (oldRingData.stat === 'maxHealth') {
+                        game.player.maxHealth -= oldRingData.value;
+                        game.player.health = Math.min(game.player.health, game.player.maxHealth);
+                    } else if (oldRingData.stat === 'maxMana') {
+                        game.player.maxMana -= oldRingData.value;
+                        game.player.mana = Math.min(game.player.mana, game.player.maxMana);
+                    }
+                    game.player.inventory.push(oldRingName);
+                }
+                speak(`You unequip the ${oldRingName} to make room for the new ring.`);
+            }
+
             const ringData = rings.find(r => r.name === ringName);
             if (!ringData) {
                 speak(`Error: Ring data not found.`);
@@ -582,7 +622,6 @@
         }
 
         function equipAmulet(command) {
-            // Updated amulet search to be more robust
             const availableAmuletsInInv = game.player.inventory.filter(item => amulets.some(a => a.name === item));
             let amuletName = null;
             
@@ -676,10 +715,18 @@
             }
             game.player.inventory.splice(itemIndex, 1);
             if (weapon) {
+                // If replacing a weapon, put old one back in inventory
+                if(game.player.weapon) {
+                    game.player.inventory.push(game.player.weapon);
+                }
                 game.player.weapon = itemName;
                 game.player.baseAttack = weapon.attack;
                 speak(`You equip the ${itemName}. Your attacks are now stronger!`);
             } else if (armor) {
+                // If replacing armor, put old one back in inventory
+                 if(game.player.armor) {
+                    game.player.inventory.push(game.player.armor);
+                }
                 game.player.armor = itemName;
                 game.player.defense = armor.defense;
                 speak(`You equip the ${itemName}. Your defense is improved!`);
@@ -687,25 +734,23 @@
         }
 
         function readBook(command) {
-            // FIX: Search for the book name in inventory first and use stricter command matching.
             let bookName = null;
-            for (const ability of abilities) {
-                const abilityLower = ability.name.toLowerCase();
-                // Check for 'book of <ability>', '<ability> book', or just the ability name if 'read' is present
-                if ((command.includes('book of ' + abilityLower) || 
-                     command.includes(abilityLower + ' book') ||
-                     (command.includes('read') && command.includes(abilityLower))) &&
-                     game.player.inventory.includes(ability.name) // MUST be in inventory
-                   ) {
-                    bookName = ability.name;
+            // Get the name of the book in the inventory that matches an ability name in the command
+            const availableBooks = game.player.inventory.filter(item => abilities.some(a => a.name === item));
+            
+            for (const item of availableBooks) {
+                // Check if the command includes a recognizable part of the ability/book name
+                const abilitySearchName = item.toLowerCase().replace(/ /g, ''); // e.g., 'iceblast'
+                const commandSearch = command.replace(/ /g, '');
+                if (commandSearch.includes(abilitySearchName)) {
+                    bookName = item;
                     break;
                 }
             }
             
             if (!bookName) {
-                const books = game.player.inventory.filter(item => abilities.some(a => a.name === item));
-                if (books.length > 0) {
-                    speak(`You have these books: ${books.join(', ')}. Say "read book of <ability name>" to learn one.`);
+                if (availableBooks.length > 0) {
+                    speak(`You have these books: ${availableBooks.join(', ')}. Say "read book of <ability name>" to learn one.`);
                 } else {
                     speak('You have no ability books. Find them in chests or secret rooms.');
                 }
@@ -751,24 +796,33 @@
             }
             game.player.mana -= ability.cost;
             let actionVerb = game.player.class === 'mage' ? 'cast' : 'execute';
-            if (ability.type === 'heal') {
+            
+            let message = '';
+
+            if (ability.type === 'damage') { 
+                const damage = ability.damage;
+                game.combat.enemy.health -= damage;
+                message = `You ${actionVerb} ${ability.name} for ${damage} damage! Enemy Health: ${Math.max(0, game.combat.enemy.health)}.`;
+            } else if (ability.type === 'heal') {
                 const oldHealth = game.player.health;
                 game.player.health = Math.min(game.player.maxHealth, game.player.health + ability.healing);
                 const actualHeal = game.player.health - oldHealth;
-                speak(`You ${actionVerb} ${ability.name} and restore ${actualHeal} health!`, () => {
-                    setTimeout(() => enemyTurn(), 1000);
-                });
+                message = `You ${actionVerb} ${ability.name} and restore ${actualHeal} health!`;
             } else if (ability.type === 'stun') {
                 game.combat.enemy.stunned = true;
-                speak(`You ${actionVerb} ${ability.name}, stunning the ${game.combat.enemy.name}!`, () => {
-                    setTimeout(() => enemyTurn(), 1000);
-                });
+                message = `You ${actionVerb} ${ability.name}, stunning the ${game.combat.enemy.name}!`;
             } else if (ability.type === 'poison') {
                 game.combat.enemy.poisoned = { damage: 5, duration: ability.duration };
-                speak(`You ${actionVerb} ${ability.name}, poisoning the ${game.combat.enemy.name}!`, () => {
-                    setTimeout(() => enemyTurn(), 1000);
-                });
+                message = `You ${actionVerb} ${ability.name}, poisoning the ${game.combat.enemy.name}!`;
             }
+
+            speak(message, () => {
+                if (game.combat.enemy.health <= 0) {
+                    endCombat('win');
+                } else {
+                    setTimeout(() => enemyTurn(), 1000);
+                }
+            });
         }
 
         function useLockpicks() {
@@ -827,7 +881,7 @@
         function selectClass(className) {
             const classData = classes[className];
             game.player.class = className;
-            game.player.level = 1; // Ensure level starts at 1
+            game.player.level = 1; 
             game.player.experience = 0;
             game.player.experienceToNext = 100;
             game.player.health = classData.health;
@@ -835,7 +889,15 @@
             game.player.mana = classData.mana;
             game.player.maxMana = classData.maxMana;
             game.player.gold = classData.gold;
-            game.player.inventory = [...classData.items];
+            
+            // Set initial items and ensure Ice Blast is available for Mages
+            let startingItems = [...classData.items];
+            if (className === 'mage') {
+                // The new ability book is added to the Mage's starting items
+                startingItems.push('Ice Blast'); 
+            }
+            game.player.inventory = startingItems;
+
             game.player.equippedRings = [];
             game.player.learnedAbilities = [];
             game.player.equippedAmulet = '';
@@ -1023,8 +1085,8 @@
 
             if (game.dungeon.hasSecretRoom && !game.dungeon.secretRoom && roll < 0.1) {
                 game.dungeon.secretRoom = { x: game.player.position.x, y: game.player.position.y, found: true };
-                messages.push('You discover a hidden crawlspace with a heavy book inside! Say "read book of heal" to learn its ability.');
-                game.player.inventory.push('Heal'); // Assuming Heal is the default ability book found in a secret
+                messages.push('You discover a hidden crawlspace with a heavy book inside! Say "read book of ice blast" to learn its ability.');
+                game.player.inventory.push('Ice Blast'); 
                 found = true;
             }
 
@@ -1149,11 +1211,9 @@
             }
 
             let message = '';
-            let fullyRestored = false;
 
             if (potionName === 'Health Potion') {
                 if (game.player.health === game.player.maxHealth) {
-                    // FIX: Prevent using potion if health is full
                     message = `Your health is already full. You save the Health Potion for later.`;
                     const combatTurn = game.combat ? () => enemyTurn() : null;
                     speak(message, combatTurn);
@@ -1165,10 +1225,8 @@
                 const actualHeal = game.player.health - oldHealth;
                 game.player.inventory.splice(potionIndex, 1);
                 message = `You drink the Health Potion and restore ${actualHeal} health!`;
-                if (game.player.health === game.player.maxHealth) fullyRestored = true;
             } else if (potionName === 'Mana Potion') {
                 if (game.player.mana === game.player.maxMana) {
-                    // FIX: Prevent using potion if mana is full
                     message = `Your mana is already full. You save the Mana Potion for later.`;
                     const combatTurn = game.combat ? () => enemyTurn() : null;
                     speak(message, combatTurn);
@@ -1180,32 +1238,51 @@
                 const actualRestore = game.player.mana - oldMana;
                 game.player.inventory.splice(potionIndex, 1);
                 message = `You drink the Mana Potion and restore ${actualRestore} mana!`;
-                if (game.player.mana === game.player.maxMana) fullyRestored = true;
             }
 
             const combatTurn = game.combat ? () => enemyTurn() : null;
             speak(message, combatTurn);
         }
+        
+        // FIX: New utility function to correctly calculate player's total attack
+        function getPlayerAttack() {
+            let attack = game.player.baseAttack; 
+            game.player.equippedRings.forEach(ringName => {
+                const ringData = rings.find(r => r.name === ringName);
+                if (ringData?.stat === 'attack') {
+                    attack += ringData.value;
+                }
+            });
+            return attack;
+        }
 
+        // FIX: Updated Status Command for clearer EXP and Attack reporting
         function characterStatus() {
-            const ringsList = game.player.equippedRings.length > 0 ? game.player.equippedRings.join(', ') : 'None';
-            const amulet = game.player.equippedAmulet || 'None';
-            const abilitiesList = game.player.learnedAbilities.length > 0 ? game.player.learnedAbilities.map(a => a.name).join(', ') : 'None';
-            const expProgress = `${game.player.experience}/${game.player.experienceToNext}`;
+            const player = game.player;
+            const classData = classes[player.class];
+            const attack = getPlayerAttack(); 
+            
+            let inventoryReport = '';
+            if (player.equippedAmulet) {
+                inventoryReport += `Equipped Amulet: ${player.equippedAmulet}. `;
+            }
+            const equippedRingsText = player.equippedRings.length > 0 ? `Equipped Rings: ${player.equippedRings.join(', ')}. ` : '';
+            
+            const expNeeded = player.experienceToNext - player.experience;
+            const abilitiesList = player.learnedAbilities.length > 0 ? player.learnedAbilities.map(a => a.name).join(', ') : 'None';
 
-            const messages = [
-                `You are a level ${game.player.level} ${classes[game.player.class].name}.`,
-                `Experience progress: ${expProgress}.`,
-                `Health: ${game.player.health} of ${game.player.maxHealth}.`,
-                `Mana: ${game.player.mana} of ${game.player.maxMana}.`,
-                `Gold: ${game.player.gold}.`,
-                `Attack: ${game.player.baseAttack}. Defense: ${game.player.defense}.`,
-                `Weapon: ${game.player.weapon || 'None'}. Armor: ${game.player.armor || 'None'}.`,
-                `Rings: ${ringsList}.`,
-                `Amulet: ${amulet}.`,
+            speakSequence([
+                `Status Report: Level ${player.level} ${classData.name}.`,
+                `Health: ${player.health} of ${player.maxHealth}.`,
+                `Mana: ${player.mana} of ${player.maxMana}.`,
+                `Total Attack Power: ${attack} (Special Ability Damage: ${classData.special.damage}). Defense: ${player.defense}.`,
+                `Experience: ${player.experience} EXP. You need ${expNeeded} more EXP to reach Level ${player.level + 1}.`,
+                `Gold: ${player.gold}.`,
+                `Equipped Weapon: ${player.weapon || 'None'}. Equipped Armor: ${player.armor || 'None'}.`,
+                equippedRingsText,
+                inventoryReport,
                 `Learned Abilities: ${abilitiesList}.`
-            ];
-            speakSequence(messages);
+            ]);
         }
 
         function listInventory() {
@@ -1269,14 +1346,9 @@
         function playerAttack() {
             if (!game.combat) return;
             const enemy = game.combat.enemy;
-            let damage = game.player.baseAttack;
-
-            const ringAttack = rings.find(r => r.stat === 'attack' && game.player.equippedRings.includes(r.name));
-            if (ringAttack) {
-                damage += ringAttack.value;
-            }
+            let damage = getPlayerAttack(); 
             
-            damage = Math.max(1, damage); // Ensure at least 1 damage
+            damage = Math.max(1, damage); 
             enemy.health -= damage;
 
             speak(`You strike the ${enemy.name} for ${damage} damage! Enemy Health: ${Math.max(0, enemy.health)}.`, () => {
@@ -1390,7 +1462,6 @@
                 const gold = enemy.gold;
                 game.player.gold += gold;
                 
-                // Call gainExperience which now handles the Amulet of Experience bonus
                 gainExperience(enemy.exp);
 
                 const messages = [
@@ -1446,5 +1517,6 @@
     </script>
 </body>
 </html>
+
 
 
