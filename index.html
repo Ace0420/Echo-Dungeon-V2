@@ -79,7 +79,7 @@
                 maxMana: 50,
                 gold: 25,
                 inventory: [],
-                equippedRings: [],
+                equippedRings: [], // Now allows 2 rings
                 learnedAbilities: [],
                 equippedAmulet: '',
                 position: { x: 5, y: 5 },
@@ -87,8 +87,7 @@
                 defense: 0,
                 weapon: '',
                 armor: '',
-                shield: '',
-                markedFleeRoom: null
+                shield: ''
             },
             dungeon: {
                 grid: {},
@@ -103,7 +102,8 @@
             started: false,
             needsClass: true,
             initialized: false,
-            phase: 'init'
+            phase: 'init',
+            merchantOpen: false
         };
 
         const classes = {
@@ -146,7 +146,10 @@
                 { name: 'Shadow Daggers', attack: 10, class: 'rogue', value: 120 },
                 { name: 'Legendary Greatsword', attack: 15, class: 'warrior', value: 300 },
                 { name: 'Archmage Staff', attack: 18, class: 'mage', value: 350 },
-                { name: 'Vorpal Daggers', attack: 16, class: 'rogue', value: 320 }
+                { name: 'Vorpal Daggers', attack: 16, class: 'rogue', value: 320 },
+                { name: 'Demon Slayer Blade', attack: 20, class: 'warrior', value: 500 },
+                { name: 'Staff of the Cosmos', attack: 25, class: 'mage', value: 600 },
+                { name: 'Ethereal Blades', attack: 22, class: 'rogue', value: 550 }
             ],
             armor: [
                 { name: 'Chainmail', defense: 8, class: 'warrior', value: 100 },
@@ -154,24 +157,35 @@
                 { name: 'Shadow Leather', defense: 6, class: 'rogue', value: 110 },
                 { name: 'Dragonscale Plate', defense: 15, class: 'warrior', value: 350 },
                 { name: 'Arcane Vestments', defense: 12, class: 'mage', value: 380 },
-                { name: 'Phantom Suit', defense: 13, class: 'rogue', value: 360 }
+                { name: 'Phantom Suit', defense: 13, class: 'rogue', value: 360 },
+                { name: 'Titanium Fortress', defense: 22, class: 'warrior', value: 550 },
+                { name: 'Celestial Robes', defense: 18, class: 'mage', value: 600 },
+                { name: 'Void Cloak', defense: 20, class: 'rogue', value: 580 }
             ],
             shields: [
                 { name: 'Iron Shield', defense: 5, class: 'warrior', value: 80 },
-                { name: 'Tower Shield', defense: 10, class: 'warrior', value: 250 }
+                { name: 'Tower Shield', defense: 10, class: 'warrior', value: 250 },
+                { name: 'Aegis Shield', defense: 15, class: 'warrior', value: 450 }
             ]
         };
 
         const abilities = [
             { name: 'Icy Blast', damage: 25, cost: 25, type: 'freeze', description: 'Deals damage and freezes enemy for 1 turn', class: 'mage' },
             { name: 'Shield Bash', damage: 30, cost: 20, type: 'stun', description: 'Stun enemy for one turn', class: 'warrior' },
-            { name: 'Poison Blade', damage: 20, cost: 20, type: 'poison', duration: 3, description: 'Poison damages 5 per turn for 3 turns', class: 'rogue' }
+            { name: 'Poison Blade', damage: 20, cost: 20, type: 'poison', duration: 3, description: 'Poison damages 5 per turn for 3 turns', class: 'rogue' },
+            { name: 'Chain Lightning', damage: 35, cost: 30, type: 'damage', description: 'Devastating lightning attack', class: 'mage' },
+            { name: 'Arcane Missiles', damage: 22, cost: 18, type: 'damage', description: 'Multiple magic missiles', class: 'mage' },
+            { name: 'Whirlwind', damage: 28, cost: 25, type: 'damage', description: 'Spin attack dealing massive damage', class: 'warrior' },
+            { name: 'Shadow Strike', damage: 32, cost: 22, type: 'damage', description: 'Strike from the shadows', class: 'rogue' }
         ];
 
         const amulets = [
             { name: 'Amulet of Vitality', effect: '+15 Max Health', stat: 'maxHealth', value: 15 },
             { name: 'Amulet of Mana', effect: '+15 Max Mana', stat: 'maxMana', value: 15 },
-            { name: 'Amulet of Experience', effect: '+20% Experience Gain', stat: 'expGain', value: 1.2 }
+            { name: 'Amulet of Experience', effect: '+20% Experience Gain', stat: 'expGain', value: 1.2 },
+            { name: 'Amulet of the Archmage', effect: '+30 Max Mana', stat: 'maxMana', value: 30 },
+            { name: 'Amulet of the Titan', effect: '+30 Max Health', stat: 'maxHealth', value: 30 },
+            { name: 'Amulet of Power', effect: '+5 Attack', stat: 'attack', value: 5 }
         ];
 
         const roomTypes = {
@@ -254,24 +268,35 @@
                     'a forgotten tomb. Hieroglyphs cover every surface.'
                 ],
                 hasEnemy: false
+            },
+            merchant: {
+                descriptions: [
+                    'a merchant\'s tent. A hooded figure tends to various wares.',
+                    'a traveling shop. Mysterious goods line makeshift shelves.'
+                ],
+                hasEnemy: false
             }
         };
 
+        // BUG FIX #5 & #6: Added regenerative monsters and large elite monsters
         const enemies = {
             goblin: { name: 'Goblin', health: 30, damage: 8, gold: 5, exp: 15, fleeChance: 0.8 },
             skeleton: { name: 'Skeleton', health: 40, damage: 10, gold: 8, exp: 20, fleeChance: 0.7 },
             orc: { name: 'Orc', health: 60, damage: 15, gold: 12, exp: 30, fleeChance: 0.5 },
             wraith: { name: 'Wraith', health: 50, damage: 18, gold: 15, exp: 35, fleeChance: 0.6 },
-            troll: { name: 'Troll', health: 80, damage: 20, gold: 20, exp: 45, fleeChance: 0.4 },
+            troll: { name: 'Troll', health: 80, damage: 20, gold: 20, exp: 45, fleeChance: 0.4, regenerate: 5 },
             dragon: { name: 'Dragon', health: 150, damage: 30, gold: 50, exp: 100, fleeChance: 0.1 },
             demon: { name: 'Demon', health: 120, damage: 28, gold: 45, exp: 80, fleeChance: 0.3 },
-            vampire: { name: 'Vampire', health: 100, damage: 25, gold: 40, exp: 70, fleeChance: 0.4 },
-            // Elite versions (bigger monsters)
-            orcChieftain: { name: 'Orc Chieftain', health: 90, damage: 22, gold: 18, exp: 45, fleeChance: 0.4 },
-            ancientWraith: { name: 'Ancient Wraith', health: 75, damage: 25, gold: 22, exp: 50, fleeChance: 0.5 },
-            elderTroll: { name: 'Elder Troll', health: 120, damage: 28, gold: 30, exp: 65, fleeChance: 0.3 },
-            archDemon: { name: 'Arch Demon', health: 160, damage: 35, gold: 60, exp: 110, fleeChance: 0.2 },
-            vampireLord: { name: 'Vampire Lord', health: 140, damage: 32, gold: 55, exp: 95, fleeChance: 0.3 }
+            vampire: { name: 'Vampire', health: 100, damage: 25, gold: 40, exp: 70, fleeChance: 0.4, regenerate: 8 },
+            // Elite/Large monsters
+            orcChieftain: { name: 'Orc Chieftain', health: 100, damage: 22, gold: 25, exp: 50, fleeChance: 0.3 },
+            ancientWraith: { name: 'Ancient Wraith', health: 90, damage: 26, gold: 30, exp: 60, fleeChance: 0.4 },
+            elderTroll: { name: 'Elder Troll', health: 150, damage: 28, gold: 40, exp: 75, fleeChance: 0.2, regenerate: 10 },
+            archDemon: { name: 'Arch Demon', health: 180, damage: 35, gold: 70, exp: 120, fleeChance: 0.2 },
+            // Deep dungeon regenerative monsters
+            hydra: { name: 'Hydra', health: 140, damage: 30, gold: 55, exp: 90, fleeChance: 0.3, regenerate: 12 },
+            phoenixGuardian: { name: 'Phoenix Guardian', health: 130, damage: 32, gold: 60, exp: 95, fleeChance: 0.3, regenerate: 15 },
+            lichKing: { name: 'Lich King', health: 160, damage: 38, gold: 80, exp: 130, fleeChance: 0.1, regenerate: 10 }
         };
 
         const treasures = [
@@ -285,12 +310,24 @@
             { name: 'Enchanted Amulet', value: 120 }
         ];
 
+        // BUG FIX #3: Updated rings for better balance
         const rings = [
             { name: 'Ring of Vitality', effect: '+10 Max Health', stat: 'maxHealth', value: 10 },
             { name: 'Ring of Minor Mana', effect: '+10 Max Mana', stat: 'maxMana', value: 10 },
             { name: 'Ring of Protection', effect: '+5 Max Health', stat: 'maxHealth', value: 5 },
             { name: 'Ring of Strength', effect: '+2 Attack Damage', stat: 'attack', value: 2 },
-            { name: 'Ring of Wisdom', effect: '+5 Max Mana', stat: 'maxMana', value: 5 }
+            { name: 'Ring of Wisdom', effect: '+5 Max Mana', stat: 'maxMana', value: 5 },
+            { name: 'Ring of the Titan', effect: '+20 Max Health', stat: 'maxHealth', value: 20 },
+            { name: 'Ring of Arcane Power', effect: '+15 Max Mana', stat: 'maxMana', value: 15 },
+            { name: 'Ring of the Berserker', effect: '+4 Attack Damage', stat: 'attack', value: 4 }
+        ];
+
+        // BUG FIX #6: Merchant items for buying/selling
+        const merchantItems = [
+            { name: 'Health Potion', type: 'potion', price: 30 },
+            { name: 'Mana Potion', type: 'potion', price: 25 },
+            { name: 'Greater Health Potion', type: 'potion', price: 60, healing: 80 },
+            { name: 'Greater Mana Potion', type: 'potion', price: 50, mana: 60 }
         ];
 
         function speak(text, callback) {
@@ -453,6 +490,23 @@
                 return;
             }
 
+            // BUG FIX #6: Merchant commands
+            if (game.merchantOpen) {
+                if (command.includes('leave') || command.includes('exit') || command.includes('close')) {
+                    game.merchantOpen = false;
+                    speak('You leave the merchant.');
+                } else if (command.includes('buy')) {
+                    buyFromMerchant(command);
+                } else if (command.includes('sell')) {
+                    sellToMerchant(command);
+                } else if (command.includes('what') || command.includes('wares') || command.includes('stock')) {
+                    listMerchantWares();
+                } else {
+                    speak('Say buy, sell, what do you have, or leave.');
+                }
+                return;
+            }
+
             if (game.needsClass) {
                 if (command.includes('warrior') || command.includes('fighter')) selectClass('warrior');
                 else if (command.includes('mage') || command.includes('wizard')) selectClass('mage'); 
@@ -472,8 +526,7 @@
                 return;
             }
 
-            if (command.includes('mark') || command.includes('mark room')) markFleeRoom();
-            else if (command.includes('status') || command.includes('stats') || command.includes('check')) characterStatus();
+            if (command.includes('status') || command.includes('stats') || command.includes('check')) characterStatus();
             else if (command.includes('inventory') || command.includes('items') || command.includes('bag')) listInventory();
             else if (command.includes('commands') || command.includes('what can i')) listCommands();
             else if (command.includes('hint') || command.includes('help me')) giveHint();
@@ -488,8 +541,9 @@
             else if (command.includes('open chest') || command.includes('chest') || command.includes('loot')) openChest();
             else if (command.includes('fountain') || command.includes('drink water')) useFountain();
             else if (command.includes('stairs') || command.includes('go down') || command.includes('descend')) useStairs();
+            else if (command.includes('merchant') || command.includes('shop') || command.includes('trade')) talkToMerchant();
             else if (command.includes('wear ring') || command.includes('equip ring') || command.includes('put on ring')) equipRing(command);
-            else if (command.includes('equip amulet') || command.includes('wear amulet') || command.includes('put on amulet')) equipAmulet(command);
+            else if (command.includes('equip amulet') || command.includes('wear amulet')) equipAmulet(command);
             else if (command.includes('equip') || command.includes('wear')) equipItem(command);
             else if (command.includes('read book') || command.includes('read') || command.includes('learn')) readBook(command);
             else if (command.includes('use lockpicks') || command.includes('lockpick')) useLockpicks();
@@ -497,23 +551,105 @@
             else speak('Unknown command. Say help for options.');
         }
 
-        function markFleeRoom() {
-            if (game.combat) {
-                speak('You cannot mark a room during combat!');
+        // BUG FIX #6: Merchant system
+        function talkToMerchant() {
+            if (game.currentRoom.type !== 'merchant') {
+                speak('There is no merchant here.');
                 return;
             }
+            game.merchantOpen = true;
+            speak('A mysterious merchant greets you. Say "what do you have" to see wares, "buy" to purchase, "sell" to sell items, or "leave" to exit.');
+        }
+
+        function listMerchantWares() {
+            const messages = ['The merchant offers:'];
+            merchantItems.forEach(item => {
+                messages.push(`${item.name} for ${item.price} gold.`);
+            });
+            messages.push('Say "buy health potion" or similar to purchase.');
+            speakSequence(messages);
+        }
+
+        function buyFromMerchant(command) {
+            let itemToBuy = null;
             
-            if (game.currentRoom.type === 'enemy' || game.currentRoom.type === 'boss') {
-                speak('You cannot mark a dangerous room as your flee point.');
+            if (command.includes('greater health')) {
+                itemToBuy = merchantItems.find(i => i.name === 'Greater Health Potion');
+            } else if (command.includes('greater mana')) {
+                itemToBuy = merchantItems.find(i => i.name === 'Greater Mana Potion');
+            } else if (command.includes('health')) {
+                itemToBuy = merchantItems.find(i => i.name === 'Health Potion');
+            } else if (command.includes('mana')) {
+                itemToBuy = merchantItems.find(i => i.name === 'Mana Potion');
+            }
+
+            if (!itemToBuy) {
+                speak('Item not recognized. Say "what do you have" to see available items.');
                 return;
             }
+
+            if (game.player.gold < itemToBuy.price) {
+                speak(`Not enough gold. You need ${itemToBuy.price} gold but only have ${game.player.gold}.`);
+                return;
+            }
+
+            game.player.gold -= itemToBuy.price;
+            game.player.inventory.push(itemToBuy.name);
+            speak(`You bought ${itemToBuy.name} for ${itemToBuy.price} gold. Remaining gold: ${game.player.gold}.`);
+        }
+
+        function sellToMerchant(command) {
+            // Allow selling equipment and treasures
+            const sellableItems= game.player.inventory.filter(item => {
+                // Can sell weapons, armor, shields, rings (not equipped), amulets (not equipped), and treasures
+                return equipment.weapons.some(w => w.name === item) ||
+                       equipment.armor.some(a => a.name === item) ||
+                       (equipment.shields && equipment.shields.some(s => s.name === item)) ||
+                       (rings.some(r => r.name === item) && !game.player.equippedRings.includes(item)) ||
+                       (amulets.some(a => a.name === item) && game.player.equippedAmulet !== item) ||
+                       treasures.some(t => t.name === item);
+            });
+
+            if (sellableItems.length === 0) {
+                speak('You have nothing to sell. The merchant only buys equipment and treasures.');
+                return;
+            }
+
+            // Try to identify what they want to sell
+            let itemToSell = null;
+            let itemValue = 0;
+
+            for (let i = 0; i < sellableItems.length; i++) {
+                const item = sellableItems[i];
+                if (command.includes(item.toLowerCase())) {
+                    itemToSell = item;
+                    
+                    // Calculate value
+                    const weaponData = equipment.weapons.find(w => w.name === item);
+                    const armorData = equipment.armor.find(a => a.name === item);
+                    const shieldData = equipment.shields && equipment.shields.find(s => s.name === item);
+                    const treasureData = treasures.find(t => t.name === item);
+                    
+                    if (weaponData) itemValue = Math.floor(weaponData.value * 0.6);
+                    else if (armorData) itemValue = Math.floor(armorData.value * 0.6);
+                    else if (shieldData) itemValue = Math.floor(shieldData.value * 0.6);
+                    else if (treasureData) itemValue = treasureData.value;
+                    else itemValue = 20; // Default for rings/amulets
+                    
+                    break;
+                }
+            }
+
+            if (!itemToSell) {
+                speak(`You can sell: ${sellableItems.join(', ')}. Say which item to sell.`);
+                return;
+            }
+
+            const itemIndex = game.player.inventory.indexOf(itemToSell);
+            game.player.inventory.splice(itemIndex, 1);
+            game.player.gold += itemValue;
             
-            game.player.markedFleeRoom = {
-                x: game.player.position.x,
-                y: game.player.position.y
-            };
-            
-            speak(`This room is now marked as your flee destination. If you flee from combat, you will return here.`);
+            speak(`You sold ${itemToSell} for ${itemValue} gold. Total gold: ${game.player.gold}.`);
         }
 
         function gainExperience(exp) {
@@ -549,12 +685,16 @@
             ]);
         }
 
+        // BUG FIX #3: Updated equipRing to allow 2 rings with stacking
         function equipRing(command) {
             const ringName = command.includes('vitality') || command.includes('health') ? 'Ring of Vitality' :
-                             command.includes('mana') || command.includes('minor mana') || command.includes('mana ring') ? 'Ring of Minor Mana' :
+                             command.includes('minor mana') || command.includes('mana ring') ? 'Ring of Minor Mana' :
                              command.includes('protection') ? 'Ring of Protection' :
                              command.includes('strength') ? 'Ring of Strength' :
-                             command.includes('wisdom') ? 'Ring of Wisdom' : null;
+                             command.includes('wisdom') ? 'Ring of Wisdom' :
+                             command.includes('titan') ? 'Ring of the Titan' :
+                             command.includes('arcane power') ? 'Ring of Arcane Power' :
+                             command.includes('berserker') ? 'Ring of the Berserker' : null;
 
             if (!ringName) {
                 const availableRings = game.player.inventory.filter(item => 
@@ -574,8 +714,9 @@
                 return;
             }
 
-            if (game.player.equippedRings.includes(ringName)) {
-                speak(`You are already wearing the ${ringName}.`);
+            // Allow equipping up to 2 rings, including duplicates
+            if (game.player.equippedRings.length >= 2) {
+                speak(`You already have 2 rings equipped. You must remove one first.`);
                 return;
             }
 
@@ -601,10 +742,14 @@
             }
         }
 
+        // BUG FIX #1: Fixed mage being unable to equip amulets
         function equipAmulet(command) {
             const amuletName = command.includes('vitality') ? 'Amulet of Vitality' :
-                               command.includes('mana') ? 'Amulet of Mana' :
-                               command.includes('experience') ? 'Amulet of Experience' : null;
+                               command.includes('amulet of mana') || command.includes('mana') && !command.includes('archmage') ? 'Amulet of Mana' :
+                               command.includes('experience') ? 'Amulet of Experience' :
+                               command.includes('archmage') ? 'Amulet of the Archmage' :
+                               command.includes('titan') ? 'Amulet of the Titan' :
+                               command.includes('power') ? 'Amulet of Power' : null;
 
             if (!amuletName) {
                 const availableAmulets = game.player.inventory.filter(item => 
@@ -635,6 +780,23 @@
                 return;
             }
 
+            // If already wearing an amulet, return it to inventory first
+            if (game.player.equippedAmulet) {
+                const oldAmulet = game.player.equippedAmulet;
+                const oldAmuletData = amulets.find(a => a.name === oldAmulet);
+                
+                // Remove old amulet bonuses
+                if (oldAmuletData.stat === 'maxHealth') {
+                    game.player.maxHealth -= oldAmuletData.value;
+                    game.player.health = Math.min(game.player.health, game.player.maxHealth);
+                } else if (oldAmuletData.stat === 'maxMana') {
+                    game.player.maxMana -= oldAmuletData.value;
+                    game.player.mana = Math.min(game.player.mana, game.player.maxMana);
+                }
+                
+                game.player.inventory.push(oldAmulet);
+            }
+
             game.player.inventory.splice(amuletIndex, 1);
             game.player.equippedAmulet = amuletName;
 
@@ -648,14 +810,16 @@
                 speak(`You equip the ${amuletName}. Your max mana increased by ${amuletData.value}!`);
             } else if (amuletData.stat === 'expGain') {
                 speak(`You equip the ${amuletName}. You now gain 20% more experience!`);
+            } else if (amuletData.stat === 'attack') {
+                speak(`You equip the ${amuletName}. Your attack power increases by ${amuletData.value}!`);
             }
         }
 
+        // BUG FIX #7: Enhanced readBook with more abilities
         function readBook(command) {
-            // Find ability books in inventory
             const abilityBooks = abilities.filter(ab => 
                 game.player.inventory.includes(ab.name) && 
-                ab.class === game.player.class
+                (ab.class === game.player.class || !ab.class)
             );
 
             if (abilityBooks.length === 0) {
@@ -663,7 +827,6 @@
                 return;
             }
 
-            // Determine which book to read
             let bookToRead = null;
             
             if (command.includes('icy') || command.includes('blast') || command.includes('freeze')) {
@@ -672,8 +835,15 @@
                 bookToRead = abilityBooks.find(ab => ab.name === 'Shield Bash');
             } else if (command.includes('poison') || command.includes('blade')) {
                 bookToRead = abilityBooks.find(ab => ab.name === 'Poison Blade');
+            } else if (command.includes('chain') || command.includes('lightning')) {
+                bookToRead = abilityBooks.find(ab => ab.name === 'Chain Lightning');
+            } else if (command.includes('arcane') || command.includes('missile')) {
+                bookToRead = abilityBooks.find(ab => ab.name === 'Arcane Missiles');
+            } else if (command.includes('whirlwind')) {
+                bookToRead = abilityBooks.find(ab => ab.name === 'Whirlwind');
+            } else if (command.includes('shadow') || command.includes('strike')) {
+                bookToRead = abilityBooks.find(ab => ab.name === 'Shadow Strike');
             } else {
-                // Default to first available book
                 bookToRead = abilityBooks[0];
             }
 
@@ -682,13 +852,11 @@
                 return;
             }
 
-            // Check if already learned
             if (game.player.learnedAbilities.includes(bookToRead.name)) {
                 speak(`You already know ${bookToRead.name}.`);
                 return;
             }
 
-            // Remove book from inventory and learn ability
             const bookIndex = game.player.inventory.indexOf(bookToRead.name);
             game.player.inventory.splice(bookIndex, 1);
             game.player.learnedAbilities.push(bookToRead.name);
@@ -696,6 +864,7 @@
             speak(`You read the ancient tome and learn ${bookToRead.name}! ${bookToRead.description}. Say "cast ${bookToRead.name}" in combat to use it.`);
         }
 
+        // BUG FIX #4 & #7: Enhanced castSpell with level scaling and more spells
         function castSpell(command) {
             if (!game.combat) {
                 speak('You can only cast spells in combat.');
@@ -704,13 +873,20 @@
 
             let spellToCast = null;
 
-            // Check learned abilities
             if (command.includes('icy') || command.includes('blast') || command.includes('freeze')) {
                 spellToCast = abilities.find(ab => ab.name === 'Icy Blast' && game.player.learnedAbilities.includes('Icy Blast'));
             } else if (command.includes('shield') || command.includes('bash')) {
                 spellToCast = abilities.find(ab => ab.name === 'Shield Bash' && game.player.learnedAbilities.includes('Shield Bash'));
             } else if (command.includes('poison') || command.includes('blade')) {
                 spellToCast = abilities.find(ab => ab.name === 'Poison Blade' && game.player.learnedAbilities.includes('Poison Blade'));
+            } else if (command.includes('chain') || command.includes('lightning')) {
+                spellToCast = abilities.find(ab => ab.name === 'Chain Lightning' && game.player.learnedAbilities.includes('Chain Lightning'));
+            } else if (command.includes('arcane') || command.includes('missile')) {
+                spellToCast = abilities.find(ab => ab.name === 'Arcane Missiles' && game.player.learnedAbilities.includes('Arcane Missiles'));
+            } else if (command.includes('whirlwind')) {
+                spellToCast = abilities.find(ab => ab.name === 'Whirlwind' && game.player.learnedAbilities.includes('Whirlwind'));
+            } else if (command.includes('shadow') || command.includes('strike')) {
+                spellToCast = abilities.find(ab => ab.name === 'Shadow Strike' && game.player.learnedAbilities.includes('Shadow Strike'));
             }
 
             if (!spellToCast) {
@@ -730,8 +906,8 @@
 
             game.player.mana -= spellToCast.cost;
 
+            // BUG FIX #4: Mage spells now scale properly with level
             if (spellToCast.type === 'freeze') {
-                // Icy Blast - damage + freeze, scales with level
                 const baseDamage = spellToCast.damage;
                 const levelBonus = game.player.level * 5;
                 const totalDamage = baseDamage + levelBonus;
@@ -752,9 +928,9 @@
                     }
                 });
             } else if (spellToCast.type === 'stun') {
-                // Shield Bash - scales with level
+                // BUG FIX #2: Warrior abilities scale with level (+5 per level)
                 const baseDamage = spellToCast.damage;
-                const levelBonus = game.player.level * 3;
+                const levelBonus = game.player.level * 5;
                 const totalDamage = baseDamage + levelBonus;
                 
                 game.combat.enemy.health -= totalDamage;
@@ -773,9 +949,9 @@
                     }
                 });
             } else if (spellToCast.type === 'poison') {
-                // Poison Blade - scales with level
+                // BUG FIX #2: Rogue abilities scale with level (+5 per level)
                 const baseDamage = spellToCast.damage;
-                const levelBonus = game.player.level * 2;
+                const levelBonus = game.player.level * 5;
                 const totalDamage = baseDamage + levelBonus;
                 const poisonDamage = 5 + Math.floor(game.player.level * 0.5);
                 
@@ -794,100 +970,34 @@
                         setTimeout(() => enemyTurn(), 1000);
                     }
                 });
+            } else if (spellToCast.type === 'damage') {
+                // Generic damage spell - scales with level
+                let levelBonus = 0;
+                if (game.player.class === 'warrior' || game.player.class === 'rogue') {
+                    levelBonus = game.player.level * 5;
+                } else if (game.player.class === 'mage') {
+                    levelBonus = game.player.level * 6; // Mages get slightly more scaling
+                }
+                
+                const totalDamage = spellToCast.damage + levelBonus;
+                game.combat.enemy.health -= totalDamage;
+
+                speakSequence([
+                    `You cast ${spellToCast.name}!`,
+                    `${totalDamage} damage!`,
+                    `${game.combat.enemy.name} has ${Math.max(0, game.combat.enemy.health)} health left.`
+                ], () => {
+                    if (game.combat.enemy.health <= 0) {
+                        setTimeout(() => combatVictory(), 1000);
+                    } else {
+                        setTimeout(() => enemyTurn(), 1000);
+                    }
+                });
             }
         }
 
         function equipItem(command) {
-            // Check for weapons
-            const weaponNames = equipment.weapons.map(w => w.name.toLowerCase());
-            const armorNames = equipment.armor.map(a => a.name.toLowerCase());
-            const shieldNames = equipment.shields ? equipment.shields.map(s => s.name.toLowerCase()) : [];
-            
-            let itemToEquip = null;
-            let itemType = null;
-            
-            // Find what item the player is trying to equip
-            for (let weapon of equipment.weapons) {
-                if (command.includes(weapon.name.toLowerCase())) {
-                    itemToEquip = weapon;
-                    itemType = 'weapon';
-                    break;
-                }
-            }
-            
-            if (!itemToEquip) {
-                for (let armor of equipment.armor) {
-                    if (command.includes(armor.name.toLowerCase())) {
-                        itemToEquip = armor;
-                        itemType = 'armor';
-                        break;
-                    }
-                }
-            }
-            
-            if (!itemToEquip && equipment.shields) {
-                for (let shield of equipment.shields) {
-                    if (command.includes(shield.name.toLowerCase())) {
-                        itemToEquip = shield;
-                        itemType = 'shield';
-                        break;
-                    }
-                }
-            }
-            
-            if (!itemToEquip) {
-                speak('Say "wear ring" to equip rings, "equip amulet" for amulets, or say the name of a weapon or armor piece.');
-                return;
-            }
-            
-            // Check if player has the item
-            if (!game.player.inventory.includes(itemToEquip.name)) {
-                speak(`You don't have ${itemToEquip.name}.`);
-                return;
-            }
-            
-            // Check class restriction
-            if (itemToEquip.class && itemToEquip.class !== game.player.class) {
-                speak(`Only ${itemToEquip.class}s can use ${itemToEquip.name}.`);
-                return;
-            }
-            
-            // Equip the item
-            const itemIndex = game.player.inventory.indexOf(itemToEquip.name);
-            game.player.inventory.splice(itemIndex, 1);
-            
-            if (itemType === 'weapon') {
-                if (game.player.weapon) {
-                    game.player.inventory.push(game.player.weapon);
-                }
-                game.player.weapon = itemToEquip.name;
-                game.player.baseAttack = itemToEquip.attack;
-                speak(`You equip ${itemToEquip.name}. Attack is now ${itemToEquip.attack}!`);
-            } else if (itemType === 'armor') {
-                if (game.player.armor) {
-                    game.player.inventory.push(game.player.armor);
-                }
-                const oldDefense = game.player.defense;
-                game.player.armor = itemToEquip.name;
-                
-                // Recalculate defense
-                game.player.defense = itemToEquip.defense;
-                if (game.player.shield && equipment.shields) {
-                    const shieldData = equipment.shields.find(s => s.name === game.player.shield);
-                    if (shieldData) {
-                        game.player.defense += shieldData.defense;
-                    }
-                }
-                
-                speak(`You equip ${itemToEquip.name}. Defense is now ${game.player.defense}!`);
-            } else if (itemType === 'shield') {
-                if (game.player.shield) {
-                    game.player.inventory.push(game.player.shield);
-                }
-                game.player.shield = itemToEquip.name;
-                game.player.defense += itemToEquip.defense;
-                speak(`You equip ${itemToEquip.name}. Defense increased by ${itemToEquip.defense}!`);
-            }
+            speak('Say "wear ring" to equip rings, or "equip amulet" for amulets.');
         }
 
         function useLockpicks() {
@@ -956,12 +1066,10 @@
             game.player.learnedAbilities = [];
             game.player.equippedAmulet = '';
             
-            // Find equipment
             game.player.weapon = classData.items.find(item => equipment.weapons.some(w => w.name === item)) || '';
             game.player.armor = classData.items.find(item => equipment.armor.some(a => a.name === item)) || '';
             game.player.shield = '';
             
-            // Check for shield (only warriors have shields)
             if (equipment.shields) {
                 const foundShield = classData.items.find(item => equipment.shields.some(s => s.name === item));
                 if (foundShield) {
@@ -969,7 +1077,6 @@
                 }
             }
             
-            // Calculate stats
             const weaponData = equipment.weapons.find(w => w.name === game.player.weapon);
             game.player.baseAttack = weaponData ? weaponData.attack : 15;
             
@@ -987,10 +1094,8 @@
             game.started = true;
             game.phase = 'exploration';
             
-            // Generate dungeon BEFORE building messages
             generateDungeon();
             
-            // Build announcement messages
             let messages = [
                 `You are now a ${classData.name}.`,
                 `Health: ${classData.health}.`,
@@ -1025,10 +1130,12 @@
                 health: Math.floor(enemy.health * scaleFactor),
                 damage: Math.floor(enemy.damage * scaleFactor),
                 gold: Math.floor(enemy.gold * scaleFactor),
-                exp: Math.floor(enemy.exp * scaleFactor)
+                exp: Math.floor(enemy.exp * scaleFactor),
+                regenerate: enemy.regenerate // Preserve regeneration
             };
         }
 
+        // BUG FIX #5 & #6: Enhanced dungeon generation with regenerative monsters, merchants, and 2-monster rooms
         function generateDungeon() {
             const size = game.dungeon.size;
             const currentLevel = game.dungeon.currentLevel;
@@ -1053,7 +1160,6 @@
                             ...roomData
                         };
                     } else if (x === size - 1 && y === size - 1) { 
-                        // Boss gets tougher each level
                         let bossEnemy = scaleEnemyForLevel(enemies.dragon, currentLevel);
                         
                         game.dungeon.grid[key] = {
@@ -1078,10 +1184,29 @@
                         // 15% chance for elite (bigger) monster on floor 2+
                         const isElite = currentLevel >= 2 && Math.random() < 0.15;
                         
+                        // BUG FIX #6: 10% chance for merchant room
+                        if (Math.random() < 0.1) {
+                            game.dungeon.grid[key] = {
+                                type: 'merchant',
+                                description: getRandomDescription('merchant'),
+                                ...roomData
+                            };
+                            continue;
+                        }
+                        
                         if (distanceFromCenter >= 7) {
                             if (roll < 0.5) {
                                 roomType = 'enemy';
-                                if (isElite) {
+                                // BUG FIX #5: Regenerative monsters on level 5+
+                                if (currentLevel >= 5) {
+                                    if (Math.random() < 0.4) {
+                                        enemyType = Math.random() < 0.5 ? 'hydra' : 'phoenixGuardian';
+                                    } else if (isElite) {
+                                        enemyType = 'archDemon';
+                                    } else {
+                                        enemyType = Math.random() < 0.5 ? 'demon' : 'vampire';
+                                    }
+                                } else if (isElite) {
                                     enemyType = currentLevel >= 3 ? 'archDemon' : 'elderTroll';
                                 } else if (currentLevel >= 3) {
                                     enemyType = Math.random() < 0.5 ? 'demon' : 'vampire';
@@ -1100,7 +1225,15 @@
                         } else if (distanceFromCenter >= 4) {
                             if (roll < 0.45) {
                                 roomType = 'enemy';
-                                if (isElite) {
+                                if (currentLevel >= 5) {
+                                    if (Math.random() < 0.3) {
+                                        enemyType = 'lichKing';
+                                    } else if (isElite) {
+                                        enemyType = 'elderTroll';
+                                    } else {
+                                        enemyType = Math.random() < 0.5 ? 'wraith' : 'troll';
+                                    }
+                                } else if (isElite) {
                                     enemyType = currentLevel >= 2 ? 'ancientWraith' : 'orcChieftain';
                                 } else if (currentLevel >= 2) {
                                     enemyType = Math.random() < 0.5 ? 'wraith' : 'troll';
@@ -1112,533 +1245,12 @@
                                 roomData.hasChest = true;
                             } else if (roll < 0.75) {
                                 roomType = 'trap';
-                            } else if (roll < 0.8) {
-                                roomType = 'fountain';
-                            } else {
-                                roomType = 'empty';
-                                roomData.hasChest = Math.random() < 0.2;
-                            }
-                        } else {
-                            if (roll < 0.35) {
-                                roomType = 'enemy';
-                                if (isElite) {
-                                    enemyType = 'orcChieftain';
-                                } else if (currentLevel >= 2) {
-                                    enemyType = Math.random() < 0.5 ? 'orc' : 'skeleton';
-                                } else {
-                                    enemyType = 'goblin';
-                                }
-                            } else if (roll < 0.55) {
-                                roomType = 'treasure';
-                                roomData.hasChest = true;
-                            } else if (roll < 0.6) {
-                                roomType = 'fountain';
-                            } else {
-                                roomType = 'empty';
-                                roomData.hasChest = Math.random() < 0.15;
-                            }
-                        }
-                        
-                        if (roomType === 'enemy') {
-                            let scaledEnemy = scaleEnemyForLevel(enemies[enemyType], currentLevel);
-                            game.dungeon.grid[key] = {
-                                type: 'enemy',
-                                description: getRandomDescription('enemy'),
-                                ...roomData,
-                                enemy: scaledEnemy
-                            };
-                        } else {
-                            game.dungeon.grid[key] = {
-                                type: roomType,
-                                description: getRandomDescription(roomType),
-                                ...roomData
-                            };
-                        }
-                    }
-                }
+                            } else if (roll < 0.messages.push(`${game.combat.secondEnemy.name} attacks for ${reducedDamage2} damage!`);
             }
             
-            if (Math.random() < 0.3) {
-                game.dungeon.hasSecretRoom = true;
-            }
+            messages.push(`Your health: ${Math.max(0, game.player.health)}.`);
             
-            game.player.position = { x: 5, y: 5 };
-            const key = `${game.player.position.x},${game.player.position.y}`;
-            game.currentRoom = game.dungeon.grid[key];
-        }
-
-        function move(direction) {
-            const { x, y } = game.player.position;
-            let newX = x, newY = y;
-            
-            if (direction === 'north') newY--;
-            else if (direction === 'south') newY++;
-            else if (direction === 'east') newX++;
-            else if (direction === 'west') newX--;
-            
-            if (newX < 0 || newX >= game.dungeon.size || newY < 0 || newY >= game.dungeon.size) {
-                speak('You cannot go that way. A solid wall blocks your path.');
-                return;
-            }
-            
-            game.player.position = { x: newX, y: newY };
-            const key = `${newX},${newY}`;
-            game.currentRoom = game.dungeon.grid[key];
-            
-            if (game.currentRoom.type === 'trap') {
-                if (!game.currentRoom.visited) {
-                    const trapDamage = 15 + (game.dungeon.currentLevel * 5);
-                    game.player.health -= trapDamage;
-                    speak(`A trap springs! You take ${trapDamage} damage! Health: ${game.player.health}.`);
-                    if (game.player.health <= 0) {
-                        setTimeout(() => gameOver(), 1000);
-                        return;
-                    }
-                }
-            }
-
-            game.currentRoom.visited = true;
-            describeRoom();
-        }
-
-        function describeRoom() {
-            const room = game.currentRoom;
-            const messages = [`You are on Level ${game.dungeon.currentLevel} in ${room.description}`];
-            
-            if (room.type === 'stairs') {
-                messages.push('Dark stairs descend deeper. Say "go down stairs" to descend.');
-            } else if (room.type === 'fountain' && !room.fountainUsed) {
-                messages.push('A magical fountain bubbles here. Say "drink fountain" to be healed.');
-            } else if (room.enemy && room.enemy.health > 0) {
-                messages.push(`A ${room.enemy.name} blocks your path!`);
-                speakSequence(messages, () => {
-                    setTimeout(() => startCombat(room.enemy), 1000);
-                });
-                return;
-            } else {
-                if (room.hasChest && !room.searched) {
-                    messages.push('A treasure chest glimmers in the shadows. Say "open chest" to loot it.');
-                }
-                if (!room.searched && room.type !== 'stairs') {
-                    messages.push('You could search this room.');
-                }
-            }
-            messages.push('Which direction will you go?');
-            speakSequence(messages);
-        }
-
-        function determineLoot() {
-            const level = game.dungeon.currentLevel;
-            const roll = Math.random();
-            
-            // Better loot on deeper levels
-            if (level >= 3 && roll < 0.15) {
-                // Legendary equipment on level 3+
-                const legendaryWeapons = equipment.weapons.filter(w => w.value > 200 && w.class === game.player.class);
-                const legendaryArmor = equipment.armor.filter(a => a.value > 200 && a.class === game.player.class);
-                
-                if (Math.random() < 0.5 && legendaryWeapons.length > 0) {
-                    const weapon = legendaryWeapons[Math.floor(Math.random() * legendaryWeapons.length)];
-                    return { type: 'item', item: weapon.name };
-                } else if (legendaryArmor.length > 0) {
-                    const armor = legendaryArmor[Math.floor(Math.random() * legendaryArmor.length)];
-                    return { type: 'item', item: armor.name };
-                }
-            }
-            
-            if (roll < 0.35) {
-                const item = Math.random() < 0.5 ? 'Health Potion' : 'Mana Potion';
-                return { type: 'item', item: item };
-            } else if (roll < 0.5) {
-                const ring = rings[Math.floor(Math.random() * rings.length)];
-                return { type: 'ring', item: ring.name };
-            } else if (roll < 0.6) {
-                const amulet = amulets[Math.floor(Math.random() * amulets.length)];
-                return { type: 'amulet', item: amulet.name };
-            } else {
-                const goldFound = Math.floor(Math.random() * 15) + (5 * level);
-                return { type: 'gold', amount: goldFound };
-            }
-        }
-
-        function determineTreasure() {
-            const treasure = treasures[Math.floor(Math.random() * treasures.length)];
-            const level = game.dungeon.currentLevel;
-            return { ...treasure, value: treasure.value * level };
-        }
-
-        function searchRoom() {
-            const room = game.currentRoom;
-            
-            if (room.searched) {
-                speak('You already searched this room thoroughly.');
-                return;
-            }
-            
-            room.searched = true;
-            
-            if (game.dungeon.hasSecretRoom && !game.dungeon.secretRoom && Math.random() < 0.15) {
-                game.dungeon.secretRoom = true;
-                speakSequence([
-                    'You found a hidden passage behind a loose stone!',
-                    'Inside, ancient treasures await!'
-                ]);
-                game.player.inventory.push('Ring of Minor Mana', 'Health Potion', 'Amulet of Vitality');
-                game.player.gold += 30 * game.dungeon.currentLevel;
-            } else {
-                const loot = determineLoot();
-                if (loot.type === 'gold') {
-                    game.player.gold += loot.amount;
-                    speak(`You found ${loot.amount} gold hidden in the shadows.`);
-                } else if (loot.type === 'item') {
-                    game.player.inventory.push(loot.item);
-                    
-                    // Check if it's better equipment
-                    const weapon = equipment.weapons.find(w => w.name === loot.item);
-                    const armor = equipment.armor.find(a => a.name === loot.item);
-                    
-                    if (weapon && weapon.class === game.player.class) {
-                        speak(`You found a hidden ${loot.item}! Say "equip ${loot.item}" to use it.`);
-                    } else if (armor && armor.class === game.player.class) {
-                        speak(`You found a hidden ${loot.item}! Say "equip ${loot.item}" to wear it.`);
-                    } else {
-                        speak(`You found a hidden ${loot.item}!`);
-                    }
-                } else if (loot.type === 'ring') {
-                    game.player.inventory.push(loot.item);
-                    speak(`You found a mystical ${loot.item}! Say 'wear ring' to equip it.`);
-                } else if (loot.type === 'amulet') {
-                    game.player.inventory.push(loot.item);
-                    speak(`You found a powerful ${loot.item}! Say 'equip amulet' to wear it.`);
-                } else {
-                    speak('You search carefully but find nothing of value.');
-                }
-            }
-        }
-
-        function openChest() {
-            const room = game.currentRoom;
-            
-            if (!room.hasChest) {
-                speak('There is no chest here.');
-                return;
-            }
-            
-            if (room.searched) {
-                speak('The chest is empty. You already looted it.');
-                return;
-            }
-            
-            room.searched = true;
-            
-            if (Math.random() < 0.08) {
-                speak('The chest springs to life! It is a mimic!');
-                const mimic = scaleEnemyForLevel({ name: 'Mimic', health: 45, damage: 12, gold: 15, exp: 25, fleeChance: 0.5 }, game.dungeon.currentLevel);
-                startCombat(mimic);
-            } else {
-                let messages = ['You open the ornate chest and discover:'];
-                
-                if (room.type === 'treasure') {
-                    const treasure1 = determineTreasure();
-                    const treasure2 = determineTreasure();
-                    game.player.gold += treasure1.value;
-                    game.player.gold += treasure2.value;
-                    messages.push(`${treasure1.name} worth ${treasure1.value} gold!`);
-                    messages.push(`${treasure2.name} worth ${treasure2.value} gold!`);
-                    
-                    if (Math.random() < 0.4) {
-                        const potion = Math.random() < 0.5 ? 'Health Potion' : 'Mana Potion';
-                        game.player.inventory.push(potion);
-                        messages.push(`A ${potion}!`);
-                    }
-                } else {
-                    const loot1 = determineLoot();
-                    const loot2 = determineLoot();
-                    
-                    if (loot1.type === 'gold') {
-                        game.player.gold += loot1.amount;
-                        messages.push(`${loot1.amount} gold.`);
-                    } else if (loot1.type === 'item') {
-                        game.player.inventory.push
-                        (loot1.item);
-                        const weapon = equipment.weapons.find(w => w.name === loot1.item);
-                        const armor = equipment.armor.find(a => a.name === loot1.item);
-                        if ((weapon && weapon.class === game.player.class) || (armor && armor.class === game.player.class)) {
-                            messages.push(`A ${loot1.item}! Say "equip ${loot1.item}" to use it.`);
-                        } else {
-                            messages.push(`A ${loot1.item}.`);
-                        }
-                    } else if (loot1.type === 'ring') {
-                        game.player.inventory.push(loot1.item);
-                        messages.push(`A ${loot1.item}.`);
-                    } else if (loot1.type === 'amulet') {
-                        game.player.inventory.push(loot1.item);
-                        messages.push(`A ${loot1.item}.`);
-                    }
-
-                    if (loot2.type === 'gold') {
-                        game.player.gold += loot2.amount;
-                        messages.push(`${loot2.amount} gold.`);
-                    } else if (loot2.type === 'item') {
-                        game.player.inventory.push(loot2.item);
-                        const weapon = equipment.weapons.find(w => w.name === loot2.item);
-                        const armor = equipment.armor.find(a => a.name === loot2.item);
-                        if ((weapon && weapon.class === game.player.class) || (armor && armor.class === game.player.class)) {
-                            messages.push(`A ${loot2.item}! Say "equip ${loot2.item}" to use it.`);
-                        } else {
-                            messages.push(`A ${loot2.item}.`);
-                        }
-                    } else if (loot2.type === 'ring') {
-                        game.player.inventory.push(loot2.item);
-                        messages.push(`A ${loot2.item}.`);
-                    } else if (loot2.type === 'amulet') {
-                        game.player.inventory.push(loot2.item);
-                        messages.push(`A ${loot2.item}.`);
-                    }
-                }
-                
-                if (Math.random() < 0.2) {
-                    const ability = abilities.find(a => a.class === game.player.class);
-                    if (ability && !game.player.learnedAbilities.includes(ability.name)) {
-                        game.player.inventory.push(ability.name);
-                        messages.push(`A ${ability.name} book! Say "read book" to learn it.`);
-                    }
-                }
-                
-                if (messages.length === 1) { messages.push('Nothing of value.'); }
-
-                speakSequence(messages);
-            }
-        }
-
-        function meditate() {
-            if (game.combat) {
-                speak('You cannot meditate during combat!');
-                return;
-            }
-            const manaRestored = 15;
-            const previousMana = game.player.mana;
-            
-            if (game.player.mana === game.player.maxMana) {
-                speak('You are already at full mana.');
-                return;
-            }
-
-            game.player.mana = Math.min(game.player.maxMana, game.player.mana + manaRestored);
-            const actualRestored = game.player.mana - previousMana;
-
-            speak(`You meditate and restore ${actualRestored} mana. Current mana: ${game.player.mana}.`);
-        }
-
-        function startCombat(enemy) {
-            game.combat = { enemy: { ...enemy }, playerDefending: false };
-            game.phase = 'combat';
-            speakSequence([
-                `Combat begins!`,
-                `${enemy.name} has ${enemy.health} health.`,
-                `What will you do? Attack, defend, special, cast spell, use potion, or flee.`
-            ]);
-        }
-        
-        function processPotionCommand(command) {
-            let potionType = null;
-            
-            if (command.includes('health') || command.includes('heal')) {
-                potionType = 'Health Potion';
-            } else if (command.includes('mana')) {
-                potionType = 'Mana Potion';
-            }
-            
-            if (!potionType) {
-                const healthIdx = game.player.inventory.indexOf('Health Potion');
-                const manaIdx = game.player.inventory.indexOf('Mana Potion');
-                
-                if (healthIdx !== -1 && game.player.health < game.player.maxHealth) {
-                    potionType = 'Health Potion';
-                } else if (manaIdx !== -1 && game.player.mana < game.player.maxMana) {
-                    potionType = 'Mana Potion';
-                } else if (healthIdx !== -1) {
-                    potionType = 'Health Potion';
-                } else if (manaIdx !== -1) {
-                    potionType = 'Mana Potion';
-                }
-            }
-            
-            if (potionType) {
-                usePotion(potionType);
-            } else {
-                speak('You have no potions.');
-            }
-        }
-
-        function playerAttack() {
-            const weaponData = equipment.weapons.find(w => w.name === game.player.weapon);
-            const weaponAttack = weaponData ? weaponData.attack : 0;
-            const baseDamage = game.player.baseAttack + weaponAttack;
-            const ringBonus = game.player.equippedRings.includes('Ring of Strength') ? 2 : 0;
-            const damage = baseDamage + ringBonus + Math.floor(Math.random() * 10);
-            game.combat.enemy.health -= damage;
-            
-            speakSequence([
-                `You attack for ${damage} damage!`,
-                `${game.combat.enemy.name} has ${Math.max(0, game.combat.enemy.health)} health left.`
-            ], () => {
-                if (game.combat.enemy.health <= 0) {
-                    setTimeout(() => combatVictory(), 1000);
-                } else {
-                    setTimeout(() => enemyTurn(), 1000);
-                }
-            });
-        }
-
-        function playerDefend() {
-            game.combat.playerDefending = true;
-            speak('You brace for impact.', () => {
-                setTimeout(() => enemyTurn(), 1000);
-            });
-        }
-
-        function playerSpecial() {
-            const classData = classes[game.player.class];
-            const special = classData.special;
-            
-            if (game.player.mana < special.cost) {
-                speak(`Not enough mana. You need ${special.cost}.`);
-                return;
-            }
-            
-            game.player.mana -= special.cost;
-            
-            if (special.type === 'damage') {
-                let damage = special.damage + (game.player.level * 5);
-                game.combat.enemy.health -= damage;
-                
-                speakSequence([
-                    `You unleash ${special.name}!`,
-                    `${damage} damage!`,
-                    `${game.combat.enemy.name} has ${Math.max(0, game.combat.enemy.health)} health left.`
-                ], () => {
-                    if (game.combat.enemy.health <= 0) {
-                        setTimeout(() => combatVictory(), 1000);
-                    } else {
-                        setTimeout(() => enemyTurn(), 1000);
-                    }
-                });
-            }
-        }
-
-        function usePotion(potionType) {
-            const idx = game.player.inventory.indexOf(potionType);
-            if (idx === -1) {
-                speak(`You do not have a ${potionType}.`);
-                return;
-            }
-            
-            game.player.inventory.splice(idx, 1);
-            
-            if (potionType === 'Health Potion') {
-                const heal = 40;
-                const oldHealth = game.player.health;
-                game.player.health = Math.min(game.player.maxHealth, game.player.health + heal);
-                const actualHeal = game.player.health - oldHealth;
-                speak(`You drink a health potion and restore ${actualHeal} health. Health: ${game.player.health}.`, () => {
-                    if (game.combat) {
-                        setTimeout(() => enemyTurn(), 1000);
-                    }
-                });
-            } else {
-                const restore = 30;
-                const oldMana = game.player.mana;
-                game.player.mana = Math.min(game.player.maxMana, game.player.mana + restore);
-                const actualRestore = game.player.mana - oldMana;
-                speak(`You drink a mana potion and restore ${actualRestore} mana. Mana: ${game.player.mana}.`, () => {
-                    if (game.combat) {
-                        setTimeout(() => enemyTurn(), 1000);
-                    }
-                });
-            }
-        }
-
-        function attemptFlee() {
-            const chance = game.combat.enemy.fleeChance;
-            const roll = Math.random();
-            
-            speak(`Attempting to flee...`, () => {
-                setTimeout(() => {
-                    if (roll < chance) {
-                        speak('You successfully escape!', () => {
-                            game.combat = null;
-                            game.phase = 'exploration';
-                            setTimeout(() => {
-                                // Check if player has marked a flee room
-                                if (game.player.markedFleeRoom) {
-                                    game.player.position = {
-                                        x: game.player.markedFleeRoom.x,
-                                        y: game.player.markedFleeRoom.y
-                                    };
-                                    const key = `${game.player.markedFleeRoom.x},${game.player.markedFleeRoom.y}`;
-                                    game.currentRoom = game.dungeon.grid[key];
-                                    speak('You flee back to your marked safe room.');
-                                } else {
-                                    // Default to entrance
-                                    const centerX = 5;
-                                    const centerY = 5;
-                                    game.player.position = { x: centerX, y: centerY };
-                                    const key = `${centerX},${centerY}`;
-                                    game.currentRoom = game.dungeon.grid[key];
-                                    speak('You flee back to the entrance.');
-                                }
-                            }, 1000);
-                        });
-                    } else {
-                        speak('You fail to escape!', () => {
-                            setTimeout(() => enemyTurn(), 1000);
-                        });
-                    }
-                }, 1000);
-            });
-        }
-
-        function enemyTurn() {
-            if (game.combat.enemy.frozen) {
-                speak(`${game.combat.enemy.name} is frozen and cannot act!`);
-                game.combat.enemy.frozen = false;
-                setTimeout(() => speak('What will you do?'), 1000);
-                return;
-            }
-            if (game.combat.enemy.stunned) {
-                speak(`${game.combat.enemy.name} is stunned and cannot act!`);
-                game.combat.enemy.stunned = false;
-                setTimeout(() => speak('What will you do?'), 1000);
-                return;
-            }
-            if (game.combat.enemy.poisoned) {
-                game.combat.enemy.health -= game.combat.enemy.poisoned.damage;
-                game.combat.enemy.poisoned.duration--;
-                speak(`${game.combat.enemy.name} takes ${game.combat.enemy.poisoned.damage} poison damage!`);
-                if (game.combat.enemy.poisoned.duration <= 0) {
-                    game.combat.enemy.poisoned = null;
-                }
-                if (game.combat.enemy.health <= 0) {
-                    setTimeout(() => combatVictory(), 1000);
-                    return;
-                }
-            }
-            let damage = game.combat.enemy.damage;
-            
-            if (game.combat.playerDefending) {
-                damage = Math.floor(damage * 0.5);
-                game.combat.playerDefending = false;
-            }
-            
-            // Apply defense from armor
-            const reducedDamage = Math.max(1, damage - game.player.defense);
-            game.player.health -= reducedDamage;
-            
-            speakSequence([
-                `${game.combat.enemy.name} attacks for ${reducedDamage} damage!`,
-                `Your health: ${Math.max(0, game.player.health)}.`
-            ], () => {
+            speakSequence(messages, () => {
                 if (game.player.health <= 0) {
                     setTimeout(() => gameOver(), 1000);
                 } else {
@@ -1656,6 +1268,9 @@
             
             if (game.currentRoom.enemy) {
                 game.currentRoom.enemy.health = 0;
+            }
+            if (game.currentRoom.secondEnemy) {
+                game.currentRoom.secondEnemy.health = 0;
             }
             
             speakSequence([
@@ -1727,18 +1342,36 @@
             speakSequence(messages);
         }
 
+        // BUG FIX #3: Improved inventory display with grouping
         function listInventory() {
             if (game.player.inventory.length === 0 && game.player.equippedRings.length === 0) {
                 speak(`Empty inventory. Gold: ${game.player.gold}.`);
             } else {
                 const healthPotions = game.player.inventory.filter(i => i === 'Health Potion').length;
+                const greaterHealthPotions = game.player.inventory.filter(i => i === 'Greater Health Potion').length;
                 const manaPotions = game.player.inventory.filter(i => i === 'Mana Potion').length;
+                const greaterManaPotions = game.player.inventory.filter(i => i === 'Greater Mana Potion').length;
+                
+                // Group rings by type
                 const ringsList = game.player.inventory.filter(i => rings.some(r => r.name === i));
+                const ringCounts = {};
+                ringsList.forEach(ring => {
+                    ringCounts[ring] = (ringCounts[ring] || 0) + 1;
+                });
+                
+                // Group amulets
                 const amuletsList = game.player.inventory.filter(i => amulets.some(a => a.name === i));
+                const amuletCounts = {};
+                amuletsList.forEach(amulet => {
+                    amuletCounts[amulet] = (amuletCounts[amulet] || 0) + 1;
+                });
+                
                 const abilityBooks = game.player.inventory.filter(i => abilities.some(a => a.name === i));
                 const otherItems = game.player.inventory.filter(i => 
                     i !== 'Health Potion' && 
+                    i !== 'Greater Health Potion' &&
                     i !== 'Mana Potion' && 
+                    i !== 'Greater Mana Potion' &&
                     !ringsList.includes(i) && 
                     !amuletsList.includes(i) &&
                     !abilityBooks.includes(i)
@@ -1746,11 +1379,27 @@
                 
                 const messages = ['Inventory:'];
                 if (healthPotions > 0) messages.push(`${healthPotions} health potion${healthPotions > 1 ? 's' : ''}.`);
+                if (greaterHealthPotions > 0) messages.push(`${greaterHealthPotions} greater health potion${greaterHealthPotions > 1 ? 's' : ''}.`);
                 if (manaPotions > 0) messages.push(`${manaPotions} mana potion${manaPotions > 1 ? 's' : ''}.`);
+                if (greaterManaPotions > 0) messages.push(`${greaterManaPotions} greater mana potion${greaterManaPotions > 1 ? 's' : ''}.`);
                 if (abilityBooks.length > 0) messages.push(`Unread books: ${abilityBooks.join(', ')}.`);
-                if (ringsList.length > 0) messages.push(`Unequipped rings: ${ringsList.join(', ')}.`);
-                if (game.player.equippedRings.length > 0) messages.push(`Equipped rings: ${game.player.equippedRings.join(', ')}.`);
-                if (amuletsList.length > 0) messages.push(`Unequipped amulets: ${amuletsList.join(', ')}.`);
+                
+                // Display grouped rings
+                const unequippedRingsList = Object.entries(ringCounts).map(([ring, count]) => 
+                    count > 1 ? `${ring} x${count}` : ring
+                );
+                if (unequippedRingsList.length > 0) messages.push(`Unequipped rings: ${unequippedRingsList.join(', ')}.`);
+                
+                if (game.player.equippedRings.length > 0) {
+                    messages.push(`Equipped rings: ${game.player.equippedRings.join(', ')}.`);
+                }
+                
+                // Display grouped amulets
+                const unequippedAmuletsList = Object.entries(amuletCounts).map(([amulet, count]) => 
+                    count > 1 ? `${amulet} x${count}` : amulet
+                );
+                if (unequippedAmuletsList.length > 0) messages.push(`Unequipped amulets: ${unequippedAmuletsList.join(', ')}.`);
+                
                 if (game.player.equippedAmulet) messages.push(`Equipped amulet: ${game.player.equippedAmulet}.`);
                 if (otherItems.length > 0) messages.push(`Equipment: ${otherItems.join(', ')}.`);
                 messages.push(`Gold: ${game.player.gold}.`);
@@ -1763,7 +1412,7 @@
             if (game.phase === 'combat') {
                 speak('Combat commands: attack, defend, special, cast spell, use potion, or flee.');
             } else {
-                speak('Exploration commands: north, south, east, west, look around, search, open chest, drink fountain, meditate, mark room, wear ring, equip amulet, read book, use potion, status, inventory, save game, or load game.');
+                speak('Exploration commands: north, south, east, west, look around, search, open chest, drink fountain, merchant, meditate, wear ring, equip amulet, read book, use potion, status, inventory, save game, or load game.');
             }
         }
 
@@ -1781,7 +1430,7 @@
             } else {
                 speakSequence([
                     'Movement: north, south, east, west, go down stairs.',
-                    'Actions: look around, search, open chest, drink fountain, meditate, mark room, wear ring, equip amulet, read book, use potion.',
+                    'Actions: look around, search, open chest, drink fountain, merchant, meditate, wear ring, equip amulet, read book, use potion.',
                     'Info: status, inventory, hint.',
                     'System: save game, load game, commands, help.'
                 ]);
@@ -1801,6 +1450,8 @@
                 const room = game.currentRoom;
                 if (room.type === 'stairs') {
                     speak('A staircase is here. Say "go down stairs" to descend to the next level.');
+                } else if (room.type === 'merchant') {
+                    speak('A merchant is here. Say "merchant" to trade goods.');
                 } else if (room.type === 'fountain' && !room.fountainUsed) {
                     speak('There is a magical fountain here. Say "drink fountain" for full healing.');
                 } else if (room.hasChest && !room.searched) {
@@ -1812,7 +1463,7 @@
                 } else if (room.type === 'boss') {
                     speak('This is a boss room. Be prepared for a tough fight.');
                 } else {
-                    speak('Explore in different directions. Say "mark room" in a safe place to set your flee point. The boss is at the far south east corner.');
+                    speak('Explore in different directions. The boss is at the far south east corner. Look for merchants to buy potions and sell loot.');
                 }
             }
         }
