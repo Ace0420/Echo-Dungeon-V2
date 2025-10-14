@@ -87,7 +87,8 @@
                 defense: 0,
                 weapon: '',
                 armor: '',
-                shield: ''
+                shield: '',
+                markedFleeRoom: null
             },
             dungeon: {
                 grid: {},
@@ -264,7 +265,13 @@
             troll: { name: 'Troll', health: 80, damage: 20, gold: 20, exp: 45, fleeChance: 0.4 },
             dragon: { name: 'Dragon', health: 150, damage: 30, gold: 50, exp: 100, fleeChance: 0.1 },
             demon: { name: 'Demon', health: 120, damage: 28, gold: 45, exp: 80, fleeChance: 0.3 },
-            vampire: { name: 'Vampire', health: 100, damage: 25, gold: 40, exp: 70, fleeChance: 0.4 }
+            vampire: { name: 'Vampire', health: 100, damage: 25, gold: 40, exp: 70, fleeChance: 0.4 },
+            // Elite versions (bigger monsters)
+            orcChieftain: { name: 'Orc Chieftain', health: 90, damage: 22, gold: 18, exp: 45, fleeChance: 0.4 },
+            ancientWraith: { name: 'Ancient Wraith', health: 75, damage: 25, gold: 22, exp: 50, fleeChance: 0.5 },
+            elderTroll: { name: 'Elder Troll', health: 120, damage: 28, gold: 30, exp: 65, fleeChance: 0.3 },
+            archDemon: { name: 'Arch Demon', health: 160, damage: 35, gold: 60, exp: 110, fleeChance: 0.2 },
+            vampireLord: { name: 'Vampire Lord', health: 140, damage: 32, gold: 55, exp: 95, fleeChance: 0.3 }
         };
 
         const treasures = [
@@ -465,7 +472,8 @@
                 return;
             }
 
-            if (command.includes('status') || command.includes('stats') || command.includes('check')) characterStatus();
+            if (command.includes('mark') || command.includes('mark room')) markFleeRoom();
+            else if (command.includes('status') || command.includes('stats') || command.includes('check')) characterStatus();
             else if (command.includes('inventory') || command.includes('items') || command.includes('bag')) listInventory();
             else if (command.includes('commands') || command.includes('what can i')) listCommands();
             else if (command.includes('hint') || command.includes('help me')) giveHint();
@@ -481,12 +489,31 @@
             else if (command.includes('fountain') || command.includes('drink water')) useFountain();
             else if (command.includes('stairs') || command.includes('go down') || command.includes('descend')) useStairs();
             else if (command.includes('wear ring') || command.includes('equip ring') || command.includes('put on ring')) equipRing(command);
-            else if (command.includes('equip amulet') || command.includes('wear amulet')) equipAmulet(command);
+            else if (command.includes('equip amulet') || command.includes('wear amulet') || command.includes('put on amulet')) equipAmulet(command);
             else if (command.includes('equip') || command.includes('wear')) equipItem(command);
             else if (command.includes('read book') || command.includes('read') || command.includes('learn')) readBook(command);
             else if (command.includes('use lockpicks') || command.includes('lockpick')) useLockpicks();
             else if (command.includes('help')) showHelp();
             else speak('Unknown command. Say help for options.');
+        }
+
+        function markFleeRoom() {
+            if (game.combat) {
+                speak('You cannot mark a room during combat!');
+                return;
+            }
+            
+            if (game.currentRoom.type === 'enemy' || game.currentRoom.type === 'boss') {
+                speak('You cannot mark a dangerous room as your flee point.');
+                return;
+            }
+            
+            game.player.markedFleeRoom = {
+                x: game.player.position.x,
+                y: game.player.position.y
+            };
+            
+            speak(`This room is now marked as your flee destination. If you flee from combat, you will return here.`);
         }
 
         function gainExperience(exp) {
@@ -547,6 +574,9 @@
                 return;
             }
 
+            if (game.player.equippedRings.includes(ringName)) {
+                speak(`You are already wearing the ${ringName}.`);
+                return;
             }
 
             const ringData = rings.find(r => r.name === ringName);
@@ -555,7 +585,7 @@
                 return;
             }
 
-            game.player.inventory.splice(ringName2);
+            game.player.inventory.splice(ringIndex, 1);
             game.player.equippedRings.push(ringName);
 
             if (ringData.stat === 'maxHealth') {
@@ -722,13 +752,17 @@
                     }
                 });
             } else if (spellToCast.type === 'stun') {
-                // Shield Bash
-                game.combat.enemy.health -= spellToCast.damage;
+                // Shield Bash - scales with level
+                const baseDamage = spellToCast.damage;
+                const levelBonus = game.player.level * 3;
+                const totalDamage = baseDamage + levelBonus;
+                
+                game.combat.enemy.health -= totalDamage;
                 game.combat.enemy.stunned = true;
 
                 speakSequence([
                     `You bash with your shield!`,
-                    `${spellToCast.damage} damage!`,
+                    `${totalDamage} damage!`,
                     `${game.combat.enemy.name} is stunned!`,
                     `${game.combat.enemy.name} has ${Math.max(0, game.combat.enemy.health)} health left.`
                 ], () => {
@@ -739,14 +773,19 @@
                     }
                 });
             } else if (spellToCast.type === 'poison') {
-                // Poison Blade
-                game.combat.enemy.health -= spellToCast.damage;
-                game.combat.enemy.poisoned = { damage: 5, duration: spellToCast.duration };
+                // Poison Blade - scales with level
+                const baseDamage = spellToCast.damage;
+                const levelBonus = game.player.level * 2;
+                const totalDamage = baseDamage + levelBonus;
+                const poisonDamage = 5 + Math.floor(game.player.level * 0.5);
+                
+                game.combat.enemy.health -= totalDamage;
+                game.combat.enemy.poisoned = { damage: poisonDamage, duration: spellToCast.duration };
 
                 speakSequence([
                     `You coat your blade in deadly poison!`,
-                    `${spellToCast.damage} initial damage!`,
-                    `Poison will damage for ${spellToCast.duration} turns!`,
+                    `${totalDamage} initial damage!`,
+                    `Poison will damage ${poisonDamage} per turn for ${spellToCast.duration} turns!`,
                     `${game.combat.enemy.name} has ${Math.max(0, game.combat.enemy.health)} health left.`
                 ], () => {
                     if (game.combat.enemy.health <= 0) {
@@ -759,7 +798,96 @@
         }
 
         function equipItem(command) {
-            speak('Say "wear ring" to equip rings, or "equip amulet" for amulets.');
+            // Check for weapons
+            const weaponNames = equipment.weapons.map(w => w.name.toLowerCase());
+            const armorNames = equipment.armor.map(a => a.name.toLowerCase());
+            const shieldNames = equipment.shields ? equipment.shields.map(s => s.name.toLowerCase()) : [];
+            
+            let itemToEquip = null;
+            let itemType = null;
+            
+            // Find what item the player is trying to equip
+            for (let weapon of equipment.weapons) {
+                if (command.includes(weapon.name.toLowerCase())) {
+                    itemToEquip = weapon;
+                    itemType = 'weapon';
+                    break;
+                }
+            }
+            
+            if (!itemToEquip) {
+                for (let armor of equipment.armor) {
+                    if (command.includes(armor.name.toLowerCase())) {
+                        itemToEquip = armor;
+                        itemType = 'armor';
+                        break;
+                    }
+                }
+            }
+            
+            if (!itemToEquip && equipment.shields) {
+                for (let shield of equipment.shields) {
+                    if (command.includes(shield.name.toLowerCase())) {
+                        itemToEquip = shield;
+                        itemType = 'shield';
+                        break;
+                    }
+                }
+            }
+            
+            if (!itemToEquip) {
+                speak('Say "wear ring" to equip rings, "equip amulet" for amulets, or say the name of a weapon or armor piece.');
+                return;
+            }
+            
+            // Check if player has the item
+            if (!game.player.inventory.includes(itemToEquip.name)) {
+                speak(`You don't have ${itemToEquip.name}.`);
+                return;
+            }
+            
+            // Check class restriction
+            if (itemToEquip.class && itemToEquip.class !== game.player.class) {
+                speak(`Only ${itemToEquip.class}s can use ${itemToEquip.name}.`);
+                return;
+            }
+            
+            // Equip the item
+            const itemIndex = game.player.inventory.indexOf(itemToEquip.name);
+            game.player.inventory.splice(itemIndex, 1);
+            
+            if (itemType === 'weapon') {
+                if (game.player.weapon) {
+                    game.player.inventory.push(game.player.weapon);
+                }
+                game.player.weapon = itemToEquip.name;
+                game.player.baseAttack = itemToEquip.attack;
+                speak(`You equip ${itemToEquip.name}. Attack is now ${itemToEquip.attack}!`);
+            } else if (itemType === 'armor') {
+                if (game.player.armor) {
+                    game.player.inventory.push(game.player.armor);
+                }
+                const oldDefense = game.player.defense;
+                game.player.armor = itemToEquip.name;
+                
+                // Recalculate defense
+                game.player.defense = itemToEquip.defense;
+                if (game.player.shield && equipment.shields) {
+                    const shieldData = equipment.shields.find(s => s.name === game.player.shield);
+                    if (shieldData) {
+                        game.player.defense += shieldData.defense;
+                    }
+                }
+                
+                speak(`You equip ${itemToEquip.name}. Defense is now ${game.player.defense}!`);
+            } else if (itemType === 'shield') {
+                if (game.player.shield) {
+                    game.player.inventory.push(game.player.shield);
+                }
+                game.player.shield = itemToEquip.name;
+                game.player.defense += itemToEquip.defense;
+                speak(`You equip ${itemToEquip.name}. Defense increased by ${itemToEquip.defense}!`);
+            }
         }
 
         function useLockpicks() {
@@ -947,11 +1075,15 @@
                         
                         const roll = Math.random();
                         
+                        // 15% chance for elite (bigger) monster on floor 2+
+                        const isElite = currentLevel >= 2 && Math.random() < 0.15;
+                        
                         if (distanceFromCenter >= 7) {
                             if (roll < 0.5) {
                                 roomType = 'enemy';
-                                // Deeper levels have tougher enemies
-                                if (currentLevel >= 3) {
+                                if (isElite) {
+                                    enemyType = currentLevel >= 3 ? 'archDemon' : 'elderTroll';
+                                } else if (currentLevel >= 3) {
                                     enemyType = Math.random() < 0.5 ? 'demon' : 'vampire';
                                 } else {
                                     enemyType = Math.random() < 0.5 ? 'troll' : 'wraith';
@@ -968,7 +1100,9 @@
                         } else if (distanceFromCenter >= 4) {
                             if (roll < 0.45) {
                                 roomType = 'enemy';
-                                if (currentLevel >= 2) {
+                                if (isElite) {
+                                    enemyType = currentLevel >= 2 ? 'ancientWraith' : 'orcChieftain';
+                                } else if (currentLevel >= 2) {
                                     enemyType = Math.random() < 0.5 ? 'wraith' : 'troll';
                                 } else {
                                     enemyType = Math.random() < 0.6 ? 'orc' : 'skeleton';
@@ -987,7 +1121,9 @@
                         } else {
                             if (roll < 0.35) {
                                 roomType = 'enemy';
-                                if (currentLevel >= 2) {
+                                if (isElite) {
+                                    enemyType = 'orcChieftain';
+                                } else if (currentLevel >= 2) {
                                     enemyType = Math.random() < 0.5 ? 'orc' : 'skeleton';
                                 } else {
                                     enemyType = 'goblin';
@@ -1156,7 +1292,18 @@
                     speak(`You found ${loot.amount} gold hidden in the shadows.`);
                 } else if (loot.type === 'item') {
                     game.player.inventory.push(loot.item);
-                    speak(`You found a hidden ${loot.item}!`);
+                    
+                    // Check if it's better equipment
+                    const weapon = equipment.weapons.find(w => w.name === loot.item);
+                    const armor = equipment.armor.find(a => a.name === loot.item);
+                    
+                    if (weapon && weapon.class === game.player.class) {
+                        speak(`You found a hidden ${loot.item}! Say "equip ${loot.item}" to use it.`);
+                    } else if (armor && armor.class === game.player.class) {
+                        speak(`You found a hidden ${loot.item}! Say "equip ${loot.item}" to wear it.`);
+                    } else {
+                        speak(`You found a hidden ${loot.item}!`);
+                    }
                 } else if (loot.type === 'ring') {
                     game.player.inventory.push(loot.item);
                     speak(`You found a mystical ${loot.item}! Say 'wear ring' to equip it.`);
@@ -1212,8 +1359,15 @@
                         game.player.gold += loot1.amount;
                         messages.push(`${loot1.amount} gold.`);
                     } else if (loot1.type === 'item') {
-                        game.player.inventory.push(loot1.item);
-                        messages.push(`A ${loot1.item}.`);
+                        game.player.inventory.push
+                        (loot1.item);
+                        const weapon = equipment.weapons.find(w => w.name === loot1.item);
+                        const armor = equipment.armor.find(a => a.name === loot1.item);
+                        if ((weapon && weapon.class === game.player.class) || (armor && armor.class === game.player.class)) {
+                            messages.push(`A ${loot1.item}! Say "equip ${loot1.item}" to use it.`);
+                        } else {
+                            messages.push(`A ${loot1.item}.`);
+                        }
                     } else if (loot1.type === 'ring') {
                         game.player.inventory.push(loot1.item);
                         messages.push(`A ${loot1.item}.`);
@@ -1227,7 +1381,13 @@
                         messages.push(`${loot2.amount} gold.`);
                     } else if (loot2.type === 'item') {
                         game.player.inventory.push(loot2.item);
-                        messages.push(`A ${loot2.item}.`);
+                        const weapon = equipment.weapons.find(w => w.name === loot2.item);
+                        const armor = equipment.armor.find(a => a.name === loot2.item);
+                        if ((weapon && weapon.class === game.player.class) || (armor && armor.class === game.player.class)) {
+                            messages.push(`A ${loot2.item}! Say "equip ${loot2.item}" to use it.`);
+                        } else {
+                            messages.push(`A ${loot2.item}.`);
+                        }
                     } else if (loot2.type === 'ring') {
                         game.player.inventory.push(loot2.item);
                         messages.push(`A ${loot2.item}.`);
@@ -1308,393 +1468,6 @@
                 usePotion(potionType);
             } else {
                 speak('You have no potions.');
-            }
-        }
-
-        function playerAttack() {
-            const baseDamage = 15;
-            const ringBonus = game.player.equippedRings.includes('Ring of Strength') ? 2 : 0;
-            const damage = baseDamage + ringBonus + Math.floor(Math.random() * 15
-                function unequipRing(command) {
-            // Find the ring based on a keyword in the command (e.g., 'vitality')
-            const equippedRing = game.player.equippedRings.find(r => 
-                r.baseName.toLowerCase().includes(command.toLowerCase().replace('unequip ring', '').trim())
-            );
-
-            if (!equippedRing) {
-                speak(`You are not wearing that ring. Equipped rings are: ${game.player.equippedRings.map(r => r.scaledName).join(', ')}.`);
-                return;
-            }
-
-            const equippedIndex = game.player.equippedRings.indexOf(equippedRing);
-
-            // Remove effects
-            unequipAccessory(equippedRing);
-
-            // Move to inventory (The scaled object is put back in inventory)
-            game.player.equippedRings.splice(equippedIndex, 1);
-            game.player.inventory.push(equippedRing);
-            
-            speak(`You unequip the ${equippedRing.scaledName}. It is now in your inventory.`);
-        }
-
-        function unequipAmulet() {
-            if (!game.player.equippedAmulet) {
-                speak('You do not have an amulet equipped.');
-                return;
-            }
-            
-            const oldAmulet = game.player.equippedAmulet;
-            
-            // Remove effects
-            unequipAccessory(oldAmulet);
-
-            // Move to inventory
-            game.player.equippedAmulet = null;
-            game.player.inventory.push(oldAmulet);
-            
-            speak(`You unequip the ${oldAmulet.scaledName}. It is now in your inventory.`);
-        }
-        
-        // Helper to get total player damage
-        function getPlayerDamage() {
-            let baseDamage = game.player.baseAttack;
-            
-            // Check for weapon
-            const weapon = equipment.weapons.find(w => w.name === game.player.weapon);
-            if (weapon) {
-                baseDamage += weapon.attack;
-            }
-
-            // Check for Ring of Strength
-            const strengthRings = game.player.equippedRings.filter(r => r.stat === 'attack');
-            strengthRings.forEach(ring => {
-                const data = getAccessoryData(ring);
-                baseDamage += data.value;
-            });
-            
-            return baseDamage;
-        }
-        
-        // Helper to get total player defense
-        function getPlayerDefense() {
-            let totalDefense = game.player.defense;
-            
-            // Check for armor
-            const armor = equipment.armor.find(a => a.name === game.player.armor);
-            if (armor) {
-                totalDefense += armor.defense;
-            }
-            
-            // Check for shield
-            const shield = equipment.shields.find(s => s.name === game.player.shield);
-            if (shield) {
-                totalDefense += shield.defense;
-            }
-            
-            return totalDefense;
-        }
-
-        function rollDice(sides) {
-            return Math.floor(Math.random() * sides) + 1;
-        }
-
-        function randomItem(list) {
-            return list[Math.floor(Math.random() * list.length)];
-        }
-
-        function selectClass(className) {
-            if (!classes[className]) {
-                speak('Invalid class. Choose warrior, mage, or rogue.');
-                return;
-            }
-
-            const classData = classes[className];
-            game.player.class = className;
-            game.player.maxHealth = classData.maxHealth;
-            game.player.health = classData.health;
-            game.player.maxMana = classData.maxMana;
-            game.player.mana = classData.mana;
-            game.player.gold = classData.gold;
-            game.player.inventory = [...classData.items];
-
-            // Equip starting gear (handled separately for visual/stat updates)
-            if (className === 'warrior') {
-                game.player.weapon = 'Steel Sword';
-                game.player.armor = 'Chainmail';
-                game.player.shield = 'Iron Shield';
-            } else if (className === 'mage') {
-                game.player.weapon = 'Mystic Staff';
-                game.player.armor = 'Enchanted Robes';
-            } else if (className === 'rogue') {
-                game.player.weapon = 'Shadow Daggers';
-                game.player.armor = 'Shadow Leather';
-            }
-            
-            game.needsClass = false;
-            game.started = true;
-            game.phase = 'exploration';
-            
-            // Immediately generate the dungeon after class selection
-            generateDungeon();
-
-            speak(`You have chosen the ${classData.name} class! Your starting gear has been equipped. You enter the dungeon on Level ${game.dungeon.currentLevel}.`, () => {
-                describeRoom();
-            });
-        }
-        
-        function generateDungeon() {
-            game.dungeon.grid = {};
-            // Make the dungeon a little larger for higher levels, max 15
-            game.dungeon.size = Math.min(10 + (game.dungeon.currentLevel - 1) * 2, 15);
-            game.dungeon.hasSecretRoom = rollDice(10) <= 3; // 30% chance of a secret room per level
-            game.dungeon.secretRoom = null;
-            
-            const gridSize = game.dungeon.size;
-            
-            // Always set starting position to center or near center
-            game.player.position = { 
-                x: Math.floor(gridSize / 2), 
-                y: Math.floor(gridSize / 2) 
-            };
-            
-            // Generate rooms
-            for (let x = 0; x < gridSize; x++) {
-                for (let y = 0; y < gridSize; y++) {
-                    const key = `${x},${y}`;
-                    const room = {
-                        x: x,
-                        y: y,
-                        type: 'empty',
-                        visited: false,
-                        description: randomItem(roomTypes.empty.descriptions),
-                        loot: null,
-                        enemy: null,
-                        trap: false
-                    };
-
-                    const distanceToCenter = Math.abs(x - game.player.position.x) + Math.abs(y - game.player.position.y);
-                    const isStart = x === game.player.position.x && y === game.player.position.y;
-                    
-                    if (isStart) {
-                        room.type = 'entrance';
-                        room.description = randomItem(roomTypes.entrance.descriptions);
-                    } else if (distanceToCenter > 1) { // Avoid generating tough rooms right next to start
-                        const dice = rollDice(100);
-
-                        if (dice < 10 && game.dungeon.currentLevel > 1) {
-                            room.type = 'stairs';
-                            room.description = randomItem(roomTypes.stairs.descriptions);
-                        } else if (dice < 25) {
-                            room.type = 'treasure';
-                            room.description = randomItem(roomTypes.treasure.descriptions);
-                            room.loot = randomItem(treasures);
-                        } else if (dice < 55) {
-                            room.type = 'enemy';
-                            room.description = randomItem(roomTypes.enemy.descriptions);
-                            room.enemy = generateEnemy();
-                        } else if (dice < 65) {
-                            room.type = 'trap';
-                            room.description = randomItem(roomTypes.trap.descriptions);
-                            room.trapDamage = rollDice(20) + (game.dungeon.currentLevel * 5);
-                        } else if (dice < 70) {
-                            room.type = 'fountain';
-                            room.description = randomItem(roomTypes.fountain.descriptions);
-                        } else if (dice < 80) {
-                            room.type = 'crypt';
-                            room.description = randomItem(roomTypes.crypt.descriptions);
-                        }
-                    }
-                    game.dungeon.grid[key] = room;
-                }
-            }
-            
-            // Ensure stairs exist if not generated randomly
-            if (!Object.values(game.dungeon.grid).some(r => r.type === 'stairs')) {
-                let stairX, stairY;
-                do {
-                    stairX = rollDice(gridSize) - 1;
-                    stairY = rollDice(gridSize) - 1;
-                } while (stairX === game.player.position.x && stairY === game.player.position.y);
-                
-                const stairKey = `${stairX},${stairY}`;
-                game.dungeon.grid[stairKey].type = 'stairs';
-                game.dungeon.grid[stairKey].description = randomItem(roomTypes.stairs.descriptions);
-                game.dungeon.grid[stairKey].hasEnemy = false;
-                game.dungeon.grid[stairKey].loot = null;
-                game.dungeon.grid[stairKey].trap = false;
-            }
-            
-            // Place boss room far away (Level 3+)
-            if (game.dungeon.currentLevel >= 3) {
-                 let bossX, bossY;
-                do {
-                    bossX = rollDice(gridSize) - 1;
-                    bossY = rollDice(gridSize) - 1;
-                    // Ensure boss is far from start and not on stairs
-                    const distance = Math.abs(bossX - game.player.position.x) + Math.abs(bossY - game.player.position.y);
-                } while (distance < gridSize / 2 || game.dungeon.grid[`${bossX},${bossY}`].type === 'stairs');
-
-                const bossKey = `${bossX},${bossY}`;
-                game.dungeon.grid[bossKey].type = 'boss';
-                game.dungeon.grid[bossKey].description = randomItem(roomTypes.boss.descriptions);
-                game.dungeon.grid[bossKey].enemy = generateBoss();
-                game.dungeon.grid[bossKey].hasEnemy = true;
-                game.dungeon.grid[bossKey].loot = null;
-            }
-            
-            // Get the current room object
-            const key = `${game.player.position.x},${game.player.position.y}`;
-            game.currentRoom = game.dungeon.grid[key];
-            game.currentRoom.visited = true;
-        }
-
-        function generateEnemy() {
-            // Scale enemy difficulty by dungeon level
-            const enemyList = Object.values(enemies);
-            const levelFactor = game.dungeon.currentLevel * 0.1;
-            
-            let baseEnemy = randomItem(enemyList.filter(e => e.name !== 'Dragon')); 
-
-            // Scale enemy stats
-            const scaledHealth = Math.floor(baseEnemy.health * (1 + levelFactor));
-            const scaledDamage = Math.floor(baseEnemy.damage * (1 + levelFactor));
-            const scaledGold = Math.floor(baseEnemy.gold * (1 + levelFactor * 0.5));
-            const scaledExp = Math.floor(baseEnemy.exp * (1 + levelFactor));
-            
-            return {
-                ...baseEnemy,
-                health: scaledHealth,
-                maxHealth: scaledHealth,
-                damage: scaledDamage,
-                gold: scaledGold,
-                exp: scaledExp
-            };
-        }
-        
-        function generateBoss() {
-            const bossTemplate = enemies.dragon;
-            const levelFactor = game.dungeon.currentLevel * 0.2; // Bosses scale harder
-            
-            const scaledHealth = Math.floor(bossTemplate.health * (1 + levelFactor));
-            const scaledDamage = Math.floor(bossTemplate.damage * (1 + levelFactor));
-            const scaledGold = Math.floor(bossTemplate.gold * (1 + levelFactor));
-            const scaledExp = Math.floor(bossTemplate.exp * (1 + levelFactor));
-            
-            return {
-                ...bossTemplate,
-                name: `The Level ${game.dungeon.currentLevel} ${bossTemplate.name}`,
-                health: scaledHealth,
-                maxHealth: scaledHealth,
-                damage: scaledDamage,
-                gold: scaledGold,
-                exp: scaledExp
-            };
-        }
-
-        function describeRoom(isMove = false) {
-            const room = game.currentRoom;
-            let messages = [];
-
-            if (isMove) {
-                messages.push(`You move to a new room. You are in ${room.description}`);
-            } else {
-                messages.push(`You are in ${room.description}`);
-            }
-            
-            // Describe exits
-            let exits = [];
-            if (game.dungeon.grid[`${room.x},${room.y - 1}`]) exits.push('North');
-            if (game.dungeon.grid[`${room.x},${room.y + 1}`]) exits.push('South');
-            if (game.dungeon.grid[`${room.x + 1},${room.y}`]) exits.push('East');
-            if (game.dungeon.grid[`${room.x - 1},${room.y}`]) exits.push('West');
-
-            messages.push(`Exits are to the ${exits.join(', ')}.`);
-
-            if (room.type === 'treasure' && room.loot) {
-                messages.push('You see a large treasure chest!');
-            } else if (room.type === 'enemy' && room.enemy && !room.cleared) {
-                messages.push(`A ${room.enemy.name} attacks! Combat initiated!`);
-                game.combat = { enemy: room.enemy, playerDefending: false, enemyFrozen: 0, enemyPoisoned: 0, playerStunned: false };
-                messages.push(`The ${room.enemy.name} has ${room.enemy.health} health.`);
-            } else if (room.type === 'boss' && room.enemy && !room.cleared) {
-                messages.push(`The massive ${room.enemy.name} roars! Prepare for a difficult battle! Combat initiated!`);
-                game.combat = { enemy: room.enemy, playerDefending: false, enemyFrozen: 0, enemyPoisoned: 0, playerStunned: false };
-                messages.push(`The ${room.enemy.name} has ${room.enemy.health} health.`);
-            } else if (room.type === 'stairs') {
-                messages.push('You see the stairs descending to the next dungeon level.');
-            } else if (room.type === 'trap' && !room.cleared) {
-                 messages.push('Be cautious! You feel a sudden draft and hear a click. This room might be trapped.');
-            } else if (room.type === 'crypt' && !room.cleared) {
-                messages.push('There might be some valuable ancient artifacts here.');
-            } else if (room.type === 'fountain') {
-                messages.push('The magical water seems inviting. You could drink or rest here.');
-            }
-
-            speakSequence(messages, () => {
-                if (game.combat) {
-                    // Start combat loop automatically after initial description
-                    if (game.combat.enemy.health > 0) {
-                        speak('Say attack, defend, special, cast spell, use potion, or flee.');
-                    }
-                }
-            });
-        }
-
-        function move(direction) {
-            if (game.combat) {
-                speak('You must deal with the enemy first! Say flee to attempt an escape.');
-                return;
-            }
-
-            let newX = game.player.position.x;
-            let newY = game.player.position.y;
-            
-            if (direction === 'north') newY--;
-            else if (direction === 'south') newY++;
-            else if (direction === 'east') newX++;
-            else if (direction === 'west') newX--;
-
-            const key = `${newX},${newY}`;
-            const newRoom = game.dungeon.grid[key];
-
-            if (newRoom) {
-                game.player.position.x = newX;
-                game.player.position.y = newY;
-                game.currentRoom = newRoom;
-                game.currentRoom.visited = true;
-
-                if (game.currentRoom.type === 'trap' && !game.currentRoom.cleared) {
-                    const damage = game.currentRoom.trapDamage;
-                    game.player.health -= damage;
-                    game.currentRoom.cleared = true; 
-                    
-                    let trapMessages = [
-                        `You fell into a hidden pit!`,
-                        `A dart shoots out and strikes you!`,
-                        `The floor gives way to poisoned spikes!`
-                    ];
-                    
-                    speak(randomItem(trapMessages) + ` You take ${damage} damage.`, () => {
-                        if (game.player.health <= 0) {
-                            endGame(false);
-                        } else {
-                            describeRoom(true);
-                        }
-                    });
-                } else if (game.currentRoom.type === 'enemy' && game.currentRoom.enemy && !game.currentRoom.cleared) {
-                     describeRoom(true);
-                } else if (game.currentRoom.type === 'boss' && game.currentRoom.enemy && !game.currentRoom.cleared) {
-                     describeRoom(true);
-                }
-                else {
-                    describeRoom(true);
-                }
-            } else {
-                speak("A solid stone wall blocks your path. You can't go that way.");
-            }
-        }
-speak('You have no potions.');
             }
         }
 
@@ -2055,6 +1828,4 @@ speak('You have no potions.');
     </script>
 </body>
 </html>
-
-
-
+        
