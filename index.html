@@ -87,7 +87,8 @@
                 defense: 0,
                 weapon: '',
                 armor: '',
-                shield: ''
+                shield: '',
+                markedFleeRoom: null
             },
             dungeon: {
                 grid: {},
@@ -264,7 +265,13 @@
             troll: { name: 'Troll', health: 80, damage: 20, gold: 20, exp: 45, fleeChance: 0.4 },
             dragon: { name: 'Dragon', health: 150, damage: 30, gold: 50, exp: 100, fleeChance: 0.1 },
             demon: { name: 'Demon', health: 120, damage: 28, gold: 45, exp: 80, fleeChance: 0.3 },
-            vampire: { name: 'Vampire', health: 100, damage: 25, gold: 40, exp: 70, fleeChance: 0.4 }
+            vampire: { name: 'Vampire', health: 100, damage: 25, gold: 40, exp: 70, fleeChance: 0.4 },
+            // Elite versions (bigger monsters)
+            orcChieftain: { name: 'Orc Chieftain', health: 90, damage: 22, gold: 18, exp: 45, fleeChance: 0.4 },
+            ancientWraith: { name: 'Ancient Wraith', health: 75, damage: 25, gold: 22, exp: 50, fleeChance: 0.5 },
+            elderTroll: { name: 'Elder Troll', health: 120, damage: 28, gold: 30, exp: 65, fleeChance: 0.3 },
+            archDemon: { name: 'Arch Demon', health: 160, damage: 35, gold: 60, exp: 110, fleeChance: 0.2 },
+            vampireLord: { name: 'Vampire Lord', health: 140, damage: 32, gold: 55, exp: 95, fleeChance: 0.3 }
         };
 
         const treasures = [
@@ -465,7 +472,8 @@
                 return;
             }
 
-            if (command.includes('status') || command.includes('stats') || command.includes('check')) characterStatus();
+            if (command.includes('mark') || command.includes('mark room')) markFleeRoom();
+            else if (command.includes('status') || command.includes('stats') || command.includes('check')) characterStatus();
             else if (command.includes('inventory') || command.includes('items') || command.includes('bag')) listInventory();
             else if (command.includes('commands') || command.includes('what can i')) listCommands();
             else if (command.includes('hint') || command.includes('help me')) giveHint();
@@ -487,6 +495,25 @@
             else if (command.includes('use lockpicks') || command.includes('lockpick')) useLockpicks();
             else if (command.includes('help')) showHelp();
             else speak('Unknown command. Say help for options.');
+        }
+
+        function markFleeRoom() {
+            if (game.combat) {
+                speak('You cannot mark a room during combat!');
+                return;
+            }
+            
+            if (game.currentRoom.type === 'enemy' || game.currentRoom.type === 'boss') {
+                speak('You cannot mark a dangerous room as your flee point.');
+                return;
+            }
+            
+            game.player.markedFleeRoom = {
+                x: game.player.position.x,
+                y: game.player.position.y
+            };
+            
+            speak(`This room is now marked as your flee destination. If you flee from combat, you will return here.`);
         }
 
         function gainExperience(exp) {
@@ -622,7 +649,7 @@
             } else if (amuletData.stat === 'expGain') {
                 speak(`You equip the ${amuletName}. You now gain 20% more experience!`);
             }
-        }
+            }
 
         function readBook(command) {
             // Find ability books in inventory
@@ -725,13 +752,17 @@
                     }
                 });
             } else if (spellToCast.type === 'stun') {
-                // Shield Bash
-                game.combat.enemy.health -= spellToCast.damage;
+                // Shield Bash - scales with level
+                const baseDamage = spellToCast.damage;
+                const levelBonus = game.player.level * 3;
+                const totalDamage = baseDamage + levelBonus;
+                
+                game.combat.enemy.health -= totalDamage;
                 game.combat.enemy.stunned = true;
 
                 speakSequence([
                     `You bash with your shield!`,
-                    `${spellToCast.damage} damage!`,
+                    `${totalDamage} damage!`,
                     `${game.combat.enemy.name} is stunned!`,
                     `${game.combat.enemy.name} has ${Math.max(0, game.combat.enemy.health)} health left.`
                 ], () => {
@@ -742,14 +773,19 @@
                     }
                 });
             } else if (spellToCast.type === 'poison') {
-                // Poison Blade
-                game.combat.enemy.health -= spellToCast.damage;
-                game.combat.enemy.poisoned = { damage: 5, duration: spellToCast.duration };
+                // Poison Blade - scales with level
+                const baseDamage = spellToCast.damage;
+                const levelBonus = game.player.level * 2;
+                const totalDamage = baseDamage + levelBonus;
+                const poisonDamage = 5 + Math.floor(game.player.level * 0.5);
+                
+                game.combat.enemy.health -= totalDamage;
+                game.combat.enemy.poisoned = { damage: poisonDamage, duration: spellToCast.duration };
 
                 speakSequence([
                     `You coat your blade in deadly poison!`,
-                    `${spellToCast.damage} initial damage!`,
-                    `Poison will damage for ${spellToCast.duration} turns!`,
+                    `${totalDamage} initial damage!`,
+                    `Poison will damage ${poisonDamage} per turn for ${spellToCast.duration} turns!`,
                     `${game.combat.enemy.name} has ${Math.max(0, game.combat.enemy.health)} health left.`
                 ], () => {
                     if (game.combat.enemy.health <= 0) {
@@ -950,11 +986,15 @@
                         
                         const roll = Math.random();
                         
+                        // 15% chance for elite (bigger) monster on floor 2+
+                        const isElite = currentLevel >= 2 && Math.random() < 0.15;
+                        
                         if (distanceFromCenter >= 7) {
                             if (roll < 0.5) {
                                 roomType = 'enemy';
-                                // Deeper levels have tougher enemies
-                                if (currentLevel >= 3) {
+                                if (isElite) {
+                                    enemyType = currentLevel >= 3 ? 'archDemon' : 'elderTroll';
+                                } else if (currentLevel >= 3) {
                                     enemyType = Math.random() < 0.5 ? 'demon' : 'vampire';
                                 } else {
                                     enemyType = Math.random() < 0.5 ? 'troll' : 'wraith';
@@ -971,7 +1011,9 @@
                         } else if (distanceFromCenter >= 4) {
                             if (roll < 0.45) {
                                 roomType = 'enemy';
-                                if (currentLevel >= 2) {
+                                if (isElite) {
+                                    enemyType = currentLevel >= 2 ? 'ancientWraith' : 'orcChieftain';
+                                } else if (currentLevel >= 2) {
                                     enemyType = Math.random() < 0.5 ? 'wraith' : 'troll';
                                 } else {
                                     enemyType = Math.random() < 0.6 ? 'orc' : 'skeleton';
@@ -990,7 +1032,9 @@
                         } else {
                             if (roll < 0.35) {
                                 roomType = 'enemy';
-                                if (currentLevel >= 2) {
+                                if (isElite) {
+                                    enemyType = 'orcChieftain';
+                                } else if (currentLevel >= 2) {
                                     enemyType = Math.random() < 0.5 ? 'orc' : 'skeleton';
                                 } else {
                                     enemyType = 'goblin';
@@ -1315,9 +1359,11 @@
         }
 
         function playerAttack() {
-            const baseDamage = 15;
+            const weaponData = equipment.weapons.find(w => w.name === game.player.weapon);
+            const weaponAttack = weaponData ? weaponData.attack : 0;
+            const baseDamage = game.player.baseAttack + weaponAttack;
             const ringBonus = game.player.equippedRings.includes('Ring of Strength') ? 2 : 0;
-            const damage = baseDamage + ringBonus + Math.floor(Math.random() * 15);
+            const damage = baseDamage + ringBonus + Math.floor(Math.random() * 10);
             game.combat.enemy.health -= damage;
             
             speakSequence([
@@ -1411,12 +1457,24 @@
                             game.combat = null;
                             game.phase = 'exploration';
                             setTimeout(() => {
-                                const centerX = 5;
-                                const centerY = 5;
-                                game.player.position = { x: centerX, y: centerY };
-                                const key = `${centerX},${centerY}`;
-                                game.currentRoom = game.dungeon.grid[key];
-                                speak('You flee back to the entrance.');
+                                // Check if player has marked a flee room
+                                if (game.player.markedFleeRoom) {
+                                    game.player.position = {
+                                        x: game.player.markedFleeRoom.x,
+                                        y: game.player.markedFleeRoom.y
+                                    };
+                                    const key = `${game.player.markedFleeRoom.x},${game.player.markedFleeRoom.y}`;
+                                    game.currentRoom = game.dungeon.grid[key];
+                                    speak('You flee back to your marked safe room.');
+                                } else {
+                                    // Default to entrance
+                                    const centerX = 5;
+                                    const centerY = 5;
+                                    game.player.position = { x: centerX, y: centerY };
+                                    const key = `${centerX},${centerY}`;
+                                    game.currentRoom = game.dungeon.grid[key];
+                                    speak('You flee back to the entrance.');
+                                }
                             }, 1000);
                         });
                     } else {
@@ -1460,10 +1518,12 @@
                 game.combat.playerDefending = false;
             }
             
-            game.player.health -= damage;
+            // Apply defense from armor
+            const reducedDamage = Math.max(1, damage - game.player.defense);
+            game.player.health -= reducedDamage;
             
             speakSequence([
-                `${game.combat.enemy.name} attacks for ${damage} damage!`,
+                `${game.combat.enemy.name} attacks for ${reducedDamage} damage!`,
                 `Your health: ${Math.max(0, game.player.health)}.`
             ], () => {
                 if (game.player.health <= 0) {
@@ -1529,6 +1589,7 @@
                 `Level ${game.player.level} ${classData.name}.`,
                 `Health: ${game.player.health} of ${game.player.maxHealth}.`,
                 `Mana: ${game.player.mana} of ${game.player.maxMana}.`,
+                `Attack: ${game.player.baseAttack}. Defense: ${game.player.defense}.`,
                 `Experience: ${game.player.experience}. Need ${expNeeded} for next level.`,
                 `Special ability: ${special.name}. Costs ${special.cost} mana. ${specialInfo}`,
                 `Gold: ${game.player.gold}.`,
@@ -1589,7 +1650,7 @@
             if (game.phase === 'combat') {
                 speak('Combat commands: attack, defend, special, cast spell, use potion, or flee.');
             } else {
-                speak('Exploration commands: north, south, east, west, look around, search, open chest, drink fountain, meditate, wear ring, equip amulet, read book, use potion, status, inventory, save game, or load game.');
+                speak('Exploration commands: north, south, east, west, look around, search, open chest, drink fountain, meditate, mark room, wear ring, equip amulet, read book, use potion, status, inventory, save game, or load game.');
             }
         }
 
@@ -1607,7 +1668,7 @@
             } else {
                 speakSequence([
                     'Movement: north, south, east, west, go down stairs.',
-                    'Actions: look around, search, open chest, drink fountain, meditate, wear ring, equip amulet, read book, use potion.',
+                    'Actions: look around, search, open chest, drink fountain, meditate, mark room, wear ring, equip amulet, read book, use potion.',
                     'Info: status, inventory, hint.',
                     'System: save game, load game, commands, help.'
                 ]);
@@ -1638,7 +1699,7 @@
                 } else if (room.type === 'boss') {
                     speak('This is a boss room. Be prepared for a tough fight.');
                 } else {
-                    speak('Explore in different directions. The boss is at the far south east corner.');
+                    speak('Explore in different directions. Say "mark room" in a safe place to set your flee point. The boss is at the far south east corner.');
                 }
             }
         }
