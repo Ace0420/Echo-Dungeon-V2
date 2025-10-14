@@ -648,8 +648,7 @@
                 speak(`You equip the ${amuletName}. Your max mana increased by ${amuletData.value}!`);
             } else if (amuletData.stat === 'expGain') {
                 speak(`You equip the ${amuletName}. You now gain 20% more experience!`);
-            }
-            }
+            }           {}
 
         function readBook(command) {
             // Find ability books in inventory
@@ -1353,8 +1352,7 @@
             
             if (potionType) {
                 usePotion(potionType);
-            } else {
-                speak('You have no potions.');
+            } else speak('You have no potions.');
             }
         }
 
